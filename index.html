@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://*.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com https://esm.sh https://cdn.tailwindcss.com https://api.dicebear.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co https://api.dicebear.com;">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>By Marcelo Medeiros OS</title>
+  <link rel="icon" type="image/png" href="/src/assets/logo.png" />
+  <link rel="manifest" href="/public/manifest.json" />
+  <meta name="theme-color" content="#020617">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fashion Fonts: Montserrat (Headings) + Inter (Body) -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['"Roboto Mono"', 'monospace'], // Keep mono for codes
+            display: ['Montserrat', 'sans-serif'], // New display font
+          },
+          colors: {
+            brand: {
+              // Enhanced Premium Blue Palette
+              dark: '#020617',   // Slate 950
+              panel: 'rgba(15, 23, 42, 0.7)', // Transparent Slate 900
+              cyan: '#3b82f6',   // Primary Blue
+              pink: '#60a5fa',   // Light accent
+              green: '#10b981',  // Success
+              accent: '#818cf8', // Indigo 400
+            }
+          },
+          backgroundImage: {
+            'premium-gradient': 'radial-gradient(circle at top left, #1e293b 0%, #020617 100%)',
+            'glass-gradient': 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #020617;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    /* Elegant Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3b82f6;
+    }
+
+    /* Clean Background (No Grid) */
+    .bg-grid {
+      background-image: none;
+    }
+
+    /* Premium Glass Card Style */
+    .tech-card {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tech-card:hover {
+      background: rgba(15, 23, 42, 0.7);
+      border-color: rgba(59, 130, 246, 0.3);
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+      transform: translateY(-4px);
+    }
+
+    /* Removed Corner Cuts for Elegance */
+    .corner-cut {
+      clip-path: none;
+    }
+
+    .corner-cut-diagonal {
+      clip-path: none;
+    }
+
+    /* Minimal Corner Accent */
+    .tech-corner::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #3b82f6);
+    }
+
+    /* Global Typography Updates */
+    .text-nexus-cyan {
+      color: #3b82f6 !important;
+      /* Force Blue */
+    }
+
+    .border-nexus-cyan {
+      border-color: #3b82f6 !important;
+    }
+
+    .bg-nexus-cyan {
+      background-color: #3b82f6 !important;
+      color: white !important;
+    }
+
+    /* Soften uppercase everywhere? Maybe keep it for labels but letter-spacing */
+    .uppercase {
+      letter-spacing: 0.1em;
+    }
+
+    /* Animated Alert Icon */
+    @keyframes pulse-alert {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+      }
+    }
+
+    .animate-pulse-alert {
+      animation: pulse-alert 2s ease-in-out infinite;
+    }
+
+    /* News Ticker Marquee */
+    @keyframes marquee {
+      0% {
+        transform: translateX(100%);
+      }
+
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+
+    .animate-marquee {
+      animation: marquee 50s linear infinite;
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "xlsx": "https://esm.sh/xlsx@^0.18.5",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/index.tsx"></script>
+</body>
+
+</html>
