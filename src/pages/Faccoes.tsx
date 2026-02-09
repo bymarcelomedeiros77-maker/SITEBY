@@ -135,68 +135,68 @@ export const Faccoes = () => {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {filteredFaccoes.map((f) => (
           <div key={f.id} className="tech-card corner-cut group hover:bg-slate-900/80 transition-all duration-300">
             {/* Header Line */}
-            <div className={`h-1 w-full ${f.status === FaccaoStatus.ATIVO ? 'bg-brand-green' : 'bg-red-600'}`}></div>
+            <div className={`h-0.5 w-full ${f.status === FaccaoStatus.ATIVO ? 'bg-brand-green' : 'bg-red-600'}`}></div>
 
-            <div className="p-6 relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-2 bg-slate-950/80 border border-slate-800 rounded-sm">
-                  {f.status === FaccaoStatus.ATIVO ? <ShieldCheck className="text-brand-green" size={20} /> : <AlertTriangle className="text-red-500" size={20} />}
+            <div className="p-3 relative z-10">
+              <div className="flex justify-between items-start mb-2">
+                <div className="p-1 bg-slate-950/80 border border-slate-800 rounded-sm">
+                  {f.status === FaccaoStatus.ATIVO ? <ShieldCheck className="text-brand-green" size={14} /> : <AlertTriangle className="text-red-500" size={14} />}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => handleOpenEdit(f)} className="p-1.5 text-slate-500 hover:text-brand-cyan hover:bg-slate-950 rounded transition-colors" title="Editar">
-                    <Edit size={16} />
+                <div className="flex gap-1">
+                  <button onClick={() => handleOpenEdit(f)} className="p-1 text-slate-500 hover:text-brand-cyan hover:bg-slate-950 rounded transition-colors" title="Editar">
+                    <Edit size={12} />
                   </button>
-                  <button onClick={() => handleDelete(f.id, f.name)} className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-slate-950 rounded transition-colors" title="Excluir">
-                    <Trash2 size={16} />
+                  <button onClick={() => handleDelete(f.id, f.name)} className="p-1 text-slate-500 hover:text-red-500 hover:bg-slate-950 rounded transition-colors" title="Excluir">
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <h3 className="text-xl font-bold text-white uppercase tracking-wider font-sans">{f.name}</h3>
-                <div className="flex items-center justify-between mt-1">
-                  <span className={`text-[10px] uppercase font-mono tracking-widest ${f.status === FaccaoStatus.ATIVO ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="mb-2">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider font-sans truncate">{f.name}</h3>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className={`text-[9px] uppercase font-mono tracking-widest ${f.status === FaccaoStatus.ATIVO ? 'text-green-500' : 'text-red-500'}`}>
                     [{f.status}]
                   </span>
-                  <span className="text-[10px] text-slate-600 font-mono">ID: {f.id}</span>
+                  <span className="text-[9px] text-slate-600 font-mono">ID: {f.id.substring(0, 8)}...</span>
                 </div>
               </div>
 
               {/* Data Grid */}
-              <div className="grid grid-cols-1 gap-px bg-slate-800 border border-slate-800 mb-4">
-                <div className="bg-slate-900/90 p-2 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold flex items-center gap-2"><Phone size={12} /> Contato</span>
-                  <span className="text-xs text-slate-300 font-mono">{f.phone || 'N/A'}</span>
+              <div className="grid grid-cols-1 gap-px bg-slate-800 border border-slate-800 mb-2">
+                <div className="bg-slate-900/90 p-1.5 flex items-center justify-between">
+                  <span className="text-[9px] text-slate-500 uppercase font-bold flex items-center gap-1"><Phone size={10} /> Contato</span>
+                  <span className="text-[10px] text-slate-300 font-mono">{f.phone || 'N/A'}</span>
                 </div>
-                <div className="bg-slate-900/90 p-2 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold flex items-center gap-2"><Activity size={12} /> Cadastro</span>
-                  <span className="text-xs text-brand-cyan font-mono">{f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                <div className="bg-slate-900/90 p-1.5 flex items-center justify-between">
+                  <span className="text-[9px] text-slate-500 uppercase font-bold flex items-center gap-1"><Activity size={10} /> Cadastro</span>
+                  <span className="text-[10px] text-brand-cyan font-mono">{f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR') : 'N/A'}</span>
                 </div>
-                <div className="bg-slate-900/90 p-2">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold flex items-center gap-2 mb-1"><Activity size={12} /> Obs</span>
-                  <p className="text-xs text-slate-400 leading-tight line-clamp-2">{f.observations || "Sem observações."}</p>
+                <div className="bg-slate-900/90 p-1.5">
+                  <span className="text-[9px] text-slate-500 uppercase font-bold flex items-center gap-1 mb-0.5"><Activity size={10} /> Obs</span>
+                  <p className="text-[10px] text-slate-400 leading-tight line-clamp-2">{f.observations || "Sem observações."}</p>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-800 border-dashed">
-                <button onClick={() => openHistory(f.id)} className="text-[10px] text-slate-500 hover:text-brand-cyan flex items-center gap-1 font-mono uppercase tracking-wider transition-colors">
-                  <History size={12} /> Access Logs
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-800 border-dashed">
+                <button onClick={() => openHistory(f.id)} className="text-[9px] text-slate-500 hover:text-brand-cyan flex items-center gap-1 font-mono uppercase tracking-wider transition-colors">
+                  <History size={10} /> Logs
                 </button>
                 <button
                   onClick={() => toggleStatus(f.id, f.status)}
-                  className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 border transition-colors ${f.status === FaccaoStatus.ATIVO ? 'border-red-900 text-red-500 hover:bg-red-950' : 'border-green-900 text-green-500 hover:bg-green-950'}`}
+                  className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 border transition-colors ${f.status === FaccaoStatus.ATIVO ? 'border-red-900 text-red-500 hover:bg-red-950' : 'border-green-900 text-green-500 hover:bg-green-950'}`}
                 >
                   {f.status === FaccaoStatus.ATIVO ? 'DESATIVAR' : 'ATIVAR'}
                 </button>
               </div>
             </div>
             {/* Background Texture */}
-            <div className="absolute bottom-0 right-0 p-4 opacity-5 pointer-events-none">
-              <MapPin size={100} />
+            <div className="absolute bottom-0 right-0 p-2 opacity-5 pointer-events-none">
+              <MapPin size={60} />
             </div>
           </div>
         ))}
