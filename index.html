@@ -6,7 +6,7 @@
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self' https://*.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com https://esm.sh https://cdn.tailwindcss.com https://api.dicebear.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co https://api.dicebear.com;">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>By Marcelo Medeiros OS</title>
+  <title>BY MARCELO SYSTEM</title>
   <link rel="icon" type="image/png" href="/src/assets/logo.png" />
   <link rel="manifest" href="/public/manifest.json" />
   <meta name="theme-color" content="#020617">
@@ -38,6 +38,15 @@
           backgroundImage: {
             'premium-gradient': 'radial-gradient(circle at top left, #1e293b 0%, #020617 100%)',
             'glass-gradient': 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)',
+          },
+          keyframes: {
+            marquee: {
+              '0%': { transform: 'translateX(0%)' },
+              '100%': { transform: 'translateX(-100%)' },
+            }
+          },
+          animation: {
+            marquee: 'marquee 40s linear infinite',
           }
         }
       }
@@ -48,6 +57,14 @@
       background-color: #020617;
       color: #e2e8f0;
       font-family: 'Inter', sans-serif;
+      /* Subtle animated aurora background */
+      background-image:
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+      background-attachment: fixed;
+      background-size: 100% 100%;
     }
 
     h1,
@@ -66,67 +83,64 @@
     }
 
     ::-webkit-scrollbar-track {
-      background: #020617;
+      background: transparent;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #1e293b;
+      background: rgba(30, 41, 59, 0.5);
       border-radius: 3px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #3b82f6;
+      background: rgba(59, 130, 246, 0.6);
     }
 
-    /* Clean Background (No Grid) */
-    .bg-grid {
-      background-image: none;
-    }
-
-    /* Premium Glass Card Style */
+    /* Premium Glass Card Style - Refined */
     .tech-card {
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(16px) saturate(180%);
-      -webkit-backdrop-filter: blur(16px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.4);
+      /* More transparent */
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      /* Subtler border */
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      /* Highlight top */
+      border-radius: 16px;
+      /* Smooth corners */
       position: relative;
       overflow: hidden;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        inset 0 0 20px rgba(0, 0, 0, 0.2);
       transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .tech-card:hover {
-      background: rgba(15, 23, 42, 0.7);
-      border-color: rgba(59, 130, 246, 0.3);
-      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
-      transform: translateY(-4px);
+      background: rgba(15, 23, 42, 0.5);
+      border-color: rgba(59, 130, 246, 0.2);
+      box-shadow:
+        0 20px 25px -5px rgba(0, 0, 0, 0.2),
+        0 10px 10px -5px rgba(0, 0, 0, 0.1),
+        0 0 15px rgba(59, 130, 246, 0.1);
+      /* Blue glow */
+      transform: translateY(-2px);
     }
 
-    /* Removed Corner Cuts for Elegance */
-    .corner-cut {
-      clip-path: none;
+    /* Smooth Button Press effect for active states */
+    button:active {
+      transform: scale(0.98);
     }
 
+    .corner-cut,
     .corner-cut-diagonal {
       clip-path: none;
+      /* Ensure no clip-paths ruin the rounded corners */
     }
 
-    /* Minimal Corner Accent */
-    .tech-corner::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 40px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, #3b82f6);
-    }
-
-    /* Global Typography Updates */
+    /* Typography Updates */
     .text-nexus-cyan {
       color: #3b82f6 !important;
-      /* Force Blue */
     }
 
     .border-nexus-cyan {
@@ -138,12 +152,12 @@
       color: white !important;
     }
 
-    /* Soften uppercase everywhere? Maybe keep it for labels but letter-spacing */
     .uppercase {
-      letter-spacing: 0.1em;
+      letter-spacing: 0.05em;
     }
 
-    /* Animated Alert Icon */
+    /* Slightly tighter tracking for elegance */
+
     @keyframes pulse-alert {
 
       0%,
@@ -162,21 +176,38 @@
       animation: pulse-alert 2s ease-in-out infinite;
     }
 
-    /* News Ticker Marquee */
-    @keyframes marquee {
+    @keyframes shimmer {
       0% {
-        transform: translateX(100%);
+        transform: translateX(-100%);
       }
 
       100% {
-        transform: translateX(-100%);
+        transform: translateX(300%);
       }
     }
 
-    .animate-marquee {
-      animation: marquee 50s linear infinite;
+    .animate-shimmer {
+      animation: shimmer 3s infinite linear;
+    }
+
+    /* Floating Animation for background elements */
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    .animate-float {
+      animation: float 6s ease-in-out infinite;
     }
   </style>
+
   <script type="importmap">
 {
   "imports": {

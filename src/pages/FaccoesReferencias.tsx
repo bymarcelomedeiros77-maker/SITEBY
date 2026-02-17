@@ -4,11 +4,14 @@ import { Faccao, CorteStatus } from '../types';
 import { ChevronDown, ChevronRight, Package, Calendar, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
 import { isFaccaoCritical } from '../utils/alertUtils';
+import { DefectReportModal } from '../components/DefectReportModal';
+import { Corte } from '../types';
 
 export const FaccoesReferencias = () => {
     const { faccoes, cortes, metas } = useApp();
     const [expandedFaccao, setExpandedFaccao] = useState<string | null>(null);
     const [modalFaccao, setModalFaccao] = useState<Faccao | null>(null);
+    const [selectedCorteReport, setSelectedCorteReport] = useState<Corte | null>(null);
 
     // Group cortes by faction
     const faccaoData = useMemo(() => {
@@ -226,7 +229,7 @@ export const FaccoesReferencias = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-3 gap-4 mt-3 p-3 bg-slate-900/50 rounded">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 p-3 bg-slate-900/50 rounded">
                                                 <div>
                                                     <div className="text-[10px] text-slate-500 uppercase">Qtd Enviada</div>
                                                     <div className="text-lg font-bold text-white font-mono">{corte.qtdTotalEnviada}</div>
@@ -241,6 +244,35 @@ export const FaccoesReferencias = () => {
                                                         {corte.qtdTotalDefeitos || '-'}
                                                     </div>
                                                 </div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 uppercase">Peças Boas</div>
+                                                    <div className={`text-lg font-bold font-mono ${(corte.qtdTotalRecebida || 0) - (corte.qtdTotalDefeitos || 0) > 0 ? 'text-blue-400' : 'text-slate-600'}`}>
+                                                        {(corte.qtdTotalRecebida || 0) - (corte.qtdTotalDefeitos || 0)}
+                                                    </div>
+                                                </div>
+
+                                                {/* Detalhamento de Defeitos */}
+                                                {corte.qtdTotalDefeitos > 0 && corte.defeitosPorTipo && Object.keys(corte.defeitosPorTipo).length > 0 && (
+                                                    <div className="mt-3 bg-red-950/30 border border-red-900/30 rounded p-3">
+                                                        <div className="text-[10px] text-red-400 uppercase font-bold mb-2 flex items-center gap-2">
+                                                            <AlertTriangle size={12} /> Relatório de Defeitos
+                                                        </div>
+                                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                                            {Object.entries(corte.defeitosPorTipo).map(([tipo, qtd]) => (
+                                                                <div key={tipo} className="flex justify-between items-center bg-black/20 p-2 rounded border border-red-900/10">
+                                                                    <span className="text-[11px] text-slate-400 uppercase truncate pr-2" title={tipo}>{tipo}</span>
+                                                                    <span className="font-mono text-red-400 font-bold text-xs">{qtd}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setSelectedCorteReport(corte)}
+                                                            className="mt-3 w-full bg-red-900/30 hover:bg-red-900/50 border border-red-900/50 text-red-400 text-[10px] font-bold uppercase py-2 rounded transition-colors flex items-center justify-center gap-2"
+                                                        >
+                                                            <AlertTriangle size={12} /> Ver Relatório Completo / Baixar
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {corte.itens && corte.itens.length > 0 && (
@@ -261,6 +293,16 @@ export const FaccoesReferencias = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Defect Report Modal */}
+            {selectedCorteReport && modalFaccao && (
+                <DefectReportModal
+                    isOpen={!!selectedCorteReport}
+                    onClose={() => setSelectedCorteReport(null)}
+                    corte={selectedCorteReport}
+                    faccaoName={modalFaccao.name}
+                />
             )}
         </div>
     );

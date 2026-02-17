@@ -8,6 +8,13 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+
+if (process.env.NODE_ENV === 'production') {
+  console.log = () => { };
+  console.error = () => { };
+  console.warn = () => { };
+}
+
 root.render(
   <React.StrictMode>
     <App />

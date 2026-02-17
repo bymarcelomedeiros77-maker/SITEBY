@@ -12,7 +12,15 @@
  * @returns ISO date string for expected delivery
  */
 export function calculateExpectedDelivery(dataEnvio: string): string {
+    if (!dataEnvio) return '';
+
     const sendDate = new Date(dataEnvio);
+
+    // Check if date is valid
+    if (isNaN(sendDate.getTime())) {
+        return '';
+    }
+
     const dayOfWeek = sendDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
     let expectedDate: Date;
@@ -55,6 +63,14 @@ export function calculateDaysOverdue(dataPrevista: string): number {
  * @returns Formatted date DD/MM/YYYY
  */
 export function formatDate(isoDate: string): string {
+    if (!isoDate) return '-';
+
     const date = new Date(isoDate);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        return '-';
+    }
+
     return date.toLocaleDateString('pt-BR');
 }

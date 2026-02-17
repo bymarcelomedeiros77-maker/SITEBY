@@ -1,18 +1,50 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { useSearchParams } from 'react-router-dom';
 import { Corte, CorteStatus, FaccaoStatus, TamanhoQuantidade, ItemCorte, DefectType, UserRole } from '../types';
-import { Plus, Search, Filter, AlertCircle, CheckCircle, Package, ArrowRight, Save, Download, History, X, Trash2, Layers, ChevronRight, ArrowLeft, Calendar } from 'lucide-react';
+import { Plus, Search, Filter, AlertCircle, CheckCircle, Package, ArrowRight, Save, Download, History, X, Trash2, Layers, ChevronRight, ArrowLeft, Calendar, RefreshCw, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Notification, NotificationType } from '../components/Notification';
 import { calculateExpectedDelivery, formatDate } from '../utils/dateUtils';
 import { FaccoesReferencias } from './FaccoesReferencias';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useConfirm } from '../hooks/useConfirm';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import { GroupedCortesModal } from '../components/GroupedCortesModal';
+import { ColorInput } from '../components/ColorInput';
 
 export const Cortes = () => {
-    const { faccoes, cortes, defectTypes, logs, addCorte, updateCorte, deleteCorte, user: currentUser } = useApp();
+    const { faccoes, cortes, defectTypes, logs, addCorte, updateCorte, deleteCorte, user: currentUser, syncCorteToStock } = useApp();
     const { confirm, confirmState, closeDialog } = useConfirm();
-    const [activeTab, setActiveTab] = useState<'LIST' | 'SEND' | 'RECEIVE' | 'FACCOES_REF' | 'HISTORICO'>('LIST');
+
+    // Group Status State
+    const [selectedGroup, setSelectedGroup] = useState<{ name: string, cortes: Corte[] } | null>(null);
+    const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+
+    const handleOpenGroupModal = (group: any) => {
+        setSelectedGroup({ name: group.faccaoName, cortes: group.cortes });
+        setIsGroupModalOpen(true);
+    };
+
+    const handleCloseGroupModal = () => {
+        setIsGroupModalOpen(false);
+        setSelectedGroup(null);
+    };
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get('tab') as 'LIST' | 'SEND' | 'RECEIVE' | 'FACCOES_REF' | 'HISTORICO' || 'LIST';
+    const [activeTab, setActiveTab] = useState(tabParam);
+
+    useEffect(() => {
+        setSearchParams({ tab: activeTab });
+    }, [activeTab, setSearchParams]);
+
+    // Sync state if URL changes
+    useEffect(() => {
+        const currentTab = searchParams.get('tab') as 'LIST' | 'SEND' | 'RECEIVE' | 'FACCOES_REF' | 'HISTORICO' || 'LIST';
+        setActiveTab(currentTab);
+    }, [searchParams]);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Filters
@@ -29,6 +61,15 @@ export const Cortes = () => {
     // History Modal
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [historyCorteId, setHistoryCorteId] = useState<string | null>(null);
+
+    // Detailed Defect Report Modal
+    const [isDefectDetailOpen, setIsDefectDetailOpen] = useState(false);
+    const [selectedCorteForDefects, setSelectedCorteForDefects] = useState<Corte | null>(null);
+
+    const openDefectDetail = (corte: Corte) => {
+        setSelectedCorteForDefects(corte);
+        setIsDefectDetailOpen(true);
+    };
 
     // --- SEND FORM STATE ---
     interface TempItem {
@@ -47,7 +88,7 @@ export const Cortes = () => {
     const [sendForm, setSendForm] = useState(initialSendState);
 
     // Calculate expected delivery date automatically
-    const [dataPrevista, setDataPrevista] = useState(calculateExpectedDelivery(sendForm.dataEnvio));
+    const [dataPrevista, setDataPrevista] = useState(startDate ? calculateExpectedDelivery(sendForm.dataEnvio) : '');
 
     // Update expected delivery when send date changes
     useEffect(() => {
@@ -60,7 +101,7 @@ export const Cortes = () => {
         {
             id: Date.now(),
             cor: '',
-            grade: [{ tamanho: 'P', quantidade: 0 }, { tamanho: 'M', quantidade: 0 }, { tamanho: 'G', quantidade: 0 }, { tamanho: 'GG', quantidade: 0 }]
+            grade: [{ tamanho: 'P', quantidade: 0 }, { tamanho: 'M', quantidade: 0 }, { tamanho: 'G', quantidade: 0 }]
         }
     ]);
 
@@ -77,6 +118,7 @@ export const Cortes = () => {
         qtdRecebida: 0,
         observacoes: '',
         standardDefects: {} as Record<string, number>, // Type ID -> Count
+        itens: [] as ItemCorte[], // Detailed breakdown for receipt
     });
     const [manualDefects, setManualDefects] = useState<ManualDefect[]>([]);
 
@@ -128,6 +170,24 @@ export const Cortes = () => {
         }
     };
 
+    const handleSyncStock = async (corteId: string) => {
+        const confirmed = await confirm({
+            title: 'Sincronizar Estoque',
+            message: 'Deseja reprocessar a entrada de estoque para este corte? Isso pode duplicar lançamentos se já tiverem sido feitos corretamente.',
+            confirmText: 'Sim, Sincronizar',
+            cancelText: 'Cancelar',
+            type: 'warning'
+        });
+
+        if (confirmed) {
+            const result = await syncCorteToStock(corteId);
+            setNotification({
+                message: result.message,
+                type: result.success ? 'success' : 'error'
+            });
+        }
+    };
+
     const exportHistoryToExcel = () => {
         const data = filteredHistoryCortes.map(corte => {
             const faccao = faccoes.find(f => f.id === corte.faccaoId)?.name || 'Desconhecida';
@@ -162,7 +222,25 @@ export const Cortes = () => {
 
     const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-    const [activeDefectCategory, setActiveDefectCategory] = useState<string>('');
+    // Sync receiveForm when selectedCorteId changes
+    useEffect(() => {
+        if (selectedCorteId) {
+            const corte = cortes.find(c => c.id === selectedCorteId);
+            if (corte) {
+                setReceiveForm(prev => ({
+                    ...prev,
+                    qtdRecebida: corte.qtdTotalEnviada,
+                    // Pre-fill received items with sent items
+                    itens: corte.itens.map(item => ({
+                        ...item,
+                        gradeRecebida: item.grade.map(g => ({ ...g }))
+                    }))
+                }));
+            }
+        }
+    }, [selectedCorteId, cortes]);
+
+    const [activeDefectCategory, setActiveDefectCategory] = useState<string | null>(null);
 
     // Set initial category when defects are loaded
     React.useEffect(() => {
@@ -195,7 +273,7 @@ export const Cortes = () => {
         setSendItems([...sendItems, {
             id: Date.now(),
             cor: '',
-            grade: [{ tamanho: 'P', quantidade: 0 }, { tamanho: 'M', quantidade: 0 }, { tamanho: 'G', quantidade: 0 }, { tamanho: 'GG', quantidade: 0 }]
+            grade: [{ tamanho: 'P', quantidade: 0 }, { tamanho: 'M', quantidade: 0 }, { tamanho: 'G', quantidade: 0 }]
         }]);
     };
 
@@ -264,10 +342,30 @@ export const Cortes = () => {
         setSendItems([{
             id: Date.now(),
             cor: '',
-            grade: [{ tamanho: 'P', quantidade: 0 }, { tamanho: 'M', quantidade: 0 }, { tamanho: 'G', quantidade: 0 }, { tamanho: 'GG', quantidade: 0 }]
+            grade: [{ tamanho: 'P', quantidade: 0 }, { tamanho: 'M', quantidade: 0 }, { tamanho: 'G', quantidade: 0 }]
         }]);
         setNotification({ message: "Corte enviado com sucesso!", type: 'success' });
         setActiveTab('LIST');
+    };
+
+    const updateReceiveGradeItem = (itemIdx: number, sizeIdx: number, value: number) => {
+        setReceiveForm(prev => {
+            const newItens = [...prev.itens];
+            if (newItens[itemIdx].gradeRecebida) {
+                newItens[itemIdx].gradeRecebida![sizeIdx].quantidade = value;
+            }
+
+            // Recalculate total received quantity
+            const total = newItens.reduce((acc, item) =>
+                acc + (item.gradeRecebida?.reduce((sum, g) => sum + Number(g.quantidade), 0) || 0), 0
+            );
+
+            return {
+                ...prev,
+                itens: newItens,
+                qtdRecebida: total
+            };
+        });
     };
 
     // --- RECEIVE HANDLERS ---
@@ -279,15 +377,34 @@ export const Cortes = () => {
         setManualDefects(manualDefects.filter(d => d.id !== id));
     };
 
-    const handleReceiveSubmit = (e: React.FormEvent) => {
+    const handleReceiveSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const corte = cortes.find(c => c.id === selectedCorteId);
         if (!corte) return;
 
         const qtdRecebidaNum = Number(receiveForm.qtdRecebida);
+        // Validating against total sent is still good as a sanity check, 
+        // but often in manufacturing you receive slightly different amounts.
+        // I'll keep the validation but maybe soften it or allow override if needed.
+        // For now, let's keep it strict as per previous logic.
         if (qtdRecebidaNum > corte.qtdTotalEnviada) {
             setNotification({ message: `Erro: A quantidade recebida (${qtdRecebidaNum}) não pode ser maior que a quantidade enviada (${corte.qtdTotalEnviada}).`, type: 'error' });
             return;
+        }
+
+        // New Validation: If received less, require justification
+        if (qtdRecebidaNum < corte.qtdTotalEnviada) {
+            const diff = corte.qtdTotalEnviada - qtdRecebidaNum;
+            const autoObs = `[DIVERGÊNCIA] Recebido ${qtdRecebidaNum} de ${corte.qtdTotalEnviada} peças enviadas. Defeito/Falta de ${diff} peças.`;
+
+            if (!receiveForm.observacoes.trim()) {
+                setReceiveForm(prev => ({ ...prev, observacoes: autoObs }));
+                setNotification({
+                    message: `Atenção: A quantidade recebida (${qtdRecebidaNum}) é MENOR que a enviada (${corte.qtdTotalEnviada}). Justificativa automática adicionada em observações. Você pode complementar se desejar.`,
+                    type: 'warning' // Soften to warning since we auto-fixed it
+                });
+                return; // Stop to let user see/edit the auto-obs
+            }
         }
 
         const combinedDefects: Record<string, number> = { ...receiveForm.standardDefects };
@@ -311,19 +428,30 @@ export const Cortes = () => {
             qtdTotalRecebida: qtdRecebidaNum,
             qtdTotalDefeitos: totalDefeitos,
             defeitosPorTipo: combinedDefects,
-            observacoesRecebimento: receiveForm.observacoes
+            observacoesRecebimento: receiveForm.observacoes,
+            itens: receiveForm.itens // This now includes gradeRecebida
         };
 
-        updateCorte(updatedCorte);
+        // 1. Update Corte Status (which triggers stock update internally in Context)
+        await updateCorte(updatedCorte);
+
+        setNotification({
+            message: "Recebimento registrado com sucesso! Estoque atualizado.",
+            type: 'success'
+        });
+
+        // No longer calling syncCorteToStock here manually to avoid race conditions with stale state.
+        // The updateCorte function in AppContext handles the stock logic.
+
         setSelectedCorteId('');
         setReceiveForm({
             dataRecebimento: new Date().toISOString().split('T')[0],
             qtdRecebida: 0,
             observacoes: '',
-            standardDefects: {}
+            standardDefects: {},
+            itens: []
         });
         setManualDefects([]);
-        setNotification({ message: "Recebimento registrado com sucesso!", type: 'success' });
         setActiveTab('LIST');
     };
 
@@ -345,6 +473,54 @@ export const Cortes = () => {
 
         return matchesSearch && matchesDate;
     });
+
+    const groupedCortes = useMemo(() => {
+        const groups: Record<string, Corte[]> = {};
+
+        // Group by Faccao ID
+        filteredCortes.forEach(corte => {
+            const key = corte.faccaoId || 'unknown';
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(corte);
+        });
+
+        // Convert to array and calculate summaries
+        return Object.entries(groups).map(([faccaoId, faccaoCortes]) => {
+            const faccaoName = faccoes.find(f => f.id === faccaoId)?.name || 'Desconhecida';
+
+            if (faccaoCortes.length === 1) {
+                return {
+                    isGroup: false,
+                    cortes: faccaoCortes,
+                    // data for sorting/display matches single item
+                    faccaoName,
+                    faccaoId,
+                    // Add dummy values to satisfy type checker if needed, or just handle in render
+                    totalEnviada: faccaoCortes[0].qtdTotalEnviada,
+                    totalRecebida: faccaoCortes[0].qtdTotalRecebida,
+                    totalDefeitos: faccaoCortes[0].qtdTotalDefeitos,
+                    latestDate: faccaoCortes[0].dataEnvio
+                };
+            } else {
+                return {
+                    isGroup: true,
+                    cortes: faccaoCortes,
+                    faccaoName,
+                    faccaoId,
+                    totalEnviada: faccaoCortes.reduce((acc, c) => acc + c.qtdTotalEnviada, 0),
+                    totalRecebida: faccaoCortes.reduce((acc, c) => acc + c.qtdTotalRecebida, 0),
+                    totalDefeitos: faccaoCortes.reduce((acc, c) => acc + c.qtdTotalDefeitos, 0),
+                    // Use most recent date for sorting
+                    latestDate: faccaoCortes.reduce((max, c) => c.dataEnvio > max ? c.dataEnvio : max, '')
+                };
+            }
+        }).sort((a, b) => {
+            return a.faccaoName.localeCompare(b.faccaoName);
+        });
+
+    }, [filteredCortes, faccoes]);
 
     const openHistory = (id: string) => {
         setHistoryCorteId(id);
@@ -453,61 +629,97 @@ export const Cortes = () => {
 
                         {/* MOBILE CARD VIEW */}
                         <div className="md:hidden space-y-4">
-                            {filteredCortes.map(c => (
-                                <div key={c.id} className="tech-card p-4 relative group border border-slate-800 bg-slate-900/80">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-nexus-cyan opacity-50 group-hover:opacity-100 transition-opacity"></div>
-
-                                    <div className="flex justify-between items-start mb-3 pl-3">
-                                        <div>
-                                            <span className="text-[10px] font-bold text-nexus-cyan uppercase tracking-wider block mb-1">REF: {c.referencia}</span>
-                                            <h4 className="text-sm font-bold text-white uppercase">{faccoes.find(f => f.id === c.faccaoId)?.name}</h4>
-                                        </div>
-                                        {renderStatus(c.status)}
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-800/50 mb-3 pl-3">
-                                        <div className="text-center">
-                                            <span className="block text-[9px] text-slate-500 uppercase font-bold">Envio</span>
-                                            <span className="text-xs text-slate-300 font-mono">{new Date(c.dataEnvio).toLocaleDateString().split('/').slice(0, 2).join('/')}</span>
-                                        </div>
-                                        <div className="text-center border-x border-slate-800/50">
-                                            <span className="block text-[9px] text-slate-500 uppercase font-bold">Qtd</span>
-                                            <span className="text-xs text-white font-mono">{c.qtdTotalEnviada}</span>
-                                        </div>
-                                        <div className="text-center">
-                                            <span className="block text-[9px] text-slate-500 uppercase font-bold">Defeitos</span>
-                                            <span className={`text-xs font-mono font-bold ${c.qtdTotalDefeitos > 0 ? 'text-red-400' : 'text-slate-600'}`}>
-                                                {c.qtdTotalDefeitos || '-'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-between items-center pl-3">
-                                        <div className="text-[10px] text-slate-500 font-mono">
-                                            {c.itens.length} Cores / {c.itens.reduce((acc, i) => acc + i.grade.length, 0)} Tamanhos
-                                        </div>
-                                        <div className="flex gap-3">
+                            {groupedCortes.map(group => {
+                                if (group.isGroup) {
+                                    return (
+                                        <div key={`group-${group.faccaoId}`} className="tech-card p-4 relative group border border-slate-700 bg-slate-900/90 shadow-xl">
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400 opacity-70"></div>
+                                            <div className="flex justify-between items-start mb-3 pl-3">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block mb-1">AGRUPADO</span>
+                                                    <h4 className="text-sm font-bold text-white uppercase">{group.faccaoName}</h4>
+                                                </div>
+                                                <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-[10px] font-bold border border-slate-700">
+                                                    {group.cortes.length} ÍTENS
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-800/50 mb-3 pl-3">
+                                                <div className="text-center">
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-bold">Total Envio</span>
+                                                    <span className="text-xs text-white font-mono">{group.totalEnviada}</span>
+                                                </div>
+                                                <div className="text-center border-x border-slate-800/50">
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-bold">Total Rec.</span>
+                                                    <span className="text-xs text-white font-mono">{group.totalRecebida}</span>
+                                                </div>
+                                                <div className="text-center">
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-bold">Defeitos</span>
+                                                    <span className={`text-xs font-mono font-bold ${group.totalDefeitos > 0 ? 'text-red-400' : 'text-slate-600'}`}>
+                                                        {group.totalDefeitos}
+                                                    </span>
+                                                </div>
+                                            </div>
                                             <button
-                                                onClick={() => openHistory(c.id)}
-                                                className="text-slate-500 hover:text-white p-2 bg-slate-950 rounded border border-slate-800"
+                                                onClick={() => handleOpenGroupModal(group)}
+                                                className="w-full bg-indigo-400/20 text-indigo-400 hover:bg-indigo-400/30 border border-indigo-400/50 py-2 rounded text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
                                             >
-                                                <History size={16} />
+                                                <Layers size={14} /> Ver Detalhes ({group.cortes.length})
                                             </button>
-                                            {c.status === CorteStatus.ENVIADO && (
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedCorteId(c.id);
-                                                        setActiveTab('RECEIVE');
-                                                    }}
-                                                    className="bg-nexus-cyan text-black px-4 py-2 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-blue-500/20"
-                                                >
-                                                    Receber
-                                                </button>
-                                            )}
                                         </div>
-                                    </div>
-                                </div>
-                            ))}
+                                    );
+                                } else {
+                                    const c = group.cortes[0];
+                                    return (
+                                        <div key={c.id} className="tech-card p-4 relative group border border-slate-800 bg-slate-900/80">
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-nexus-cyan opacity-50 group-hover:opacity-100 transition-opacity"></div>
+
+                                            <div className="flex justify-between items-start mb-3 pl-3">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-nexus-cyan uppercase tracking-wider block mb-1">REF: {c.referencia}</span>
+                                                    <h4 className="text-sm font-bold text-white uppercase">{faccoes.find(f => f.id === c.faccaoId)?.name}</h4>
+                                                </div>
+                                                {renderStatus(c.status)}
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-800/50 mb-3 pl-3">
+                                                <div className="text-center">
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-bold">Envio</span>
+                                                    <span className="text-xs text-slate-300 font-mono">{new Date(c.dataEnvio).toLocaleDateString().split('/').slice(0, 2).join('/')}</span>
+                                                </div>
+                                                <div className="text-center border-x border-slate-800/50">
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-bold">Qtd</span>
+                                                    <span className="text-xs text-white font-mono">{c.qtdTotalEnviada}</span>
+                                                </div>
+                                                <div className="text-center">
+                                                    <span className="block text-[9px] text-slate-500 uppercase font-bold">Defeitos</span>
+                                                    <span className={`text-xs font-mono font-bold ${c.qtdTotalDefeitos > 0 ? 'text-red-400 cursor-pointer hover:underline' : 'text-slate-600'}`}
+                                                        onClick={() => c.qtdTotalDefeitos > 0 && openDefectDetail(c)}
+                                                    >
+                                                        {c.qtdTotalDefeitos || '-'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center pl-3">
+                                                <div className="text-[10px] text-slate-500 font-mono">
+                                                    {c.itens.length} Cores / {c.itens.reduce((acc, i) => acc + i.grade.length, 0)} Tamanhos
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={() => handleOpenGroupModal({
+                                                            faccaoName: faccoes.find(f => f.id === c.faccaoId)?.name || 'Desconhecida',
+                                                            cortes: [c]
+                                                        })}
+                                                        className="bg-indigo-400/20 text-indigo-400 hover:bg-indigo-400/30 border border-indigo-400/50 py-2 px-4 rounded text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-lg"
+                                                    >
+                                                        <Layers size={14} /> Ver Detalhes
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                            })}
 
                             {filteredCortes.length === 0 && (
                                 <div className="text-center py-10 border border-dashed border-slate-800 rounded bg-slate-900/50">
@@ -534,48 +746,72 @@ export const Cortes = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50 font-mono">
-                                    {filteredCortes.map(c => (
-                                        <tr key={c.id} className="hover:bg-slate-800/30 transition-colors group border-l-2 border-transparent hover:border-nexus-cyan">
-                                            <td className="px-6 py-4 font-bold text-white">{c.referencia}</td>
-                                            <td className="px-6 py-4 text-slate-300">{faccoes.find(f => f.id === c.faccaoId)?.name}</td>
-                                            <td className="px-6 py-4">{new Date(c.dataEnvio).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col gap-1">
-                                                    {c.itens.map((i, idx) => (
-                                                        <span key={idx} className="text-xs">{i.cor} ({i.quantidadeTotalCor})</span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-white">{c.qtdTotalEnviada}</td>
-                                            <td className="px-6 py-4">{c.qtdTotalRecebida > 0 ? <span className="text-nexus-green">{c.qtdTotalRecebida}</span> : '-'}</td>
-                                            <td className="px-6 py-4">
-                                                {c.qtdTotalDefeitos > 0 ? (
-                                                    <span className="text-red-400 font-bold">{c.qtdTotalDefeitos}</span>
-                                                ) : '-'}
-                                            </td>
-                                            <td className="px-6 py-4">{renderStatus(c.status)}</td>
-                                            <td className="px-6 py-4 flex items-center gap-3">
-                                                {c.status === CorteStatus.ENVIADO && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedCorteId(c.id);
-                                                            setActiveTab('RECEIVE');
-                                                        }}
-                                                        className="text-nexus-cyan hover:bg-nexus-cyan/10 px-2 py-1 rounded transition-colors text-xs uppercase font-bold flex items-center gap-1"
-                                                    >
-                                                        Receber <ChevronRight size={12} />
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => openHistory(c.id)}
-                                                    className="text-slate-600 hover:text-white transition-colors p-1"
-                                                    title="Ver Histórico"
-                                                >
-                                                    <History size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {groupedCortes.map((group, index) => {
+                                        if (group.isGroup) {
+                                            return (
+                                                <tr key={`group-${group.faccaoId}-${index}`} className="hover:bg-slate-800/30 transition-colors group border-l-2 border-transparent hover:border-indigo-400 bg-slate-900/30">
+                                                    <td className="px-6 py-4 font-bold text-indigo-400 italic">Múltiplas ({group.cortes.length})</td>
+                                                    <td className="px-6 py-4 text-white font-bold">{group.faccaoName}</td>
+                                                    <td className="px-6 py-4 text-slate-500">-</td>
+                                                    <td className="px-6 py-4 text-slate-500 italic">Vários Itens</td>
+                                                    <td className="px-6 py-4 text-white font-bold">{group.totalEnviada}</td>
+                                                    <td className="px-6 py-4 text-white">{group.totalRecebida}</td>
+                                                    <td className="px-6 py-4 text-red-400 font-bold">{group.totalDefeitos > 0 ? group.totalDefeitos : '-'}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-slate-500 bg-slate-800/50 border border-slate-700 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase font-mono">AGRUPADO</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <button
+                                                            onClick={() => handleOpenGroupModal(group)}
+                                                            className="text-indigo-400 hover:text-white hover:bg-indigo-400/20 px-3 py-1.5 rounded transition-all text-xs uppercase font-bold flex items-center gap-2 border border-indigo-400/30 hover:border-indigo-400"
+                                                        >
+                                                            <Layers size={14} /> Ver Detalhes
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        } else {
+                                            const c = group.cortes[0];
+                                            return (
+                                                <tr key={c.id} className="hover:bg-slate-800/30 transition-colors group border-l-2 border-transparent hover:border-nexus-cyan">
+                                                    <td className="px-6 py-4 font-bold text-white">{c.referencia}</td>
+                                                    <td className="px-6 py-4 text-slate-300">{faccoes.find(f => f.id === c.faccaoId)?.name}</td>
+                                                    <td className="px-6 py-4">{new Date(c.dataEnvio).toLocaleDateString()}</td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col gap-1">
+                                                            {c.itens.map((i, idx) => (
+                                                                <span key={idx} className="text-xs">{i.cor} ({i.quantidadeTotalCor})</span>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-white">{c.qtdTotalEnviada}</td>
+                                                    <td className="px-6 py-4">{c.qtdTotalRecebida > 0 ? <span className="text-nexus-green">{c.qtdTotalRecebida}</span> : '-'}</td>
+                                                    <td className="px-6 py-4">
+                                                        {c.qtdTotalDefeitos > 0 ? (
+                                                            <button
+                                                                onClick={() => openDefectDetail(c)}
+                                                                className="text-red-400 font-bold hover:text-red-300 hover:underline transition-all font-mono"
+                                                            >
+                                                                {c.qtdTotalDefeitos}
+                                                            </button>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4">{renderStatus(c.status)}</td>
+                                                    <td className="px-6 py-4">
+                                                        <button
+                                                            onClick={() => handleOpenGroupModal({
+                                                                faccaoName: faccoes.find(f => f.id === c.faccaoId)?.name || 'Desconhecida',
+                                                                cortes: [c]
+                                                            })}
+                                                            className="text-indigo-400 hover:text-white hover:bg-indigo-400/20 px-3 py-1.5 rounded transition-all text-xs uppercase font-bold flex items-center gap-2 border border-indigo-400/30 hover:border-indigo-400"
+                                                        >
+                                                            <Layers size={14} /> Ver Detalhes
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+                                    })}
                                     {filteredCortes.length === 0 && (
                                         <tr>
                                             <td colSpan={9} className="px-6 py-12 text-center text-slate-600 border-dashed border-slate-800">
@@ -666,14 +902,17 @@ export const Cortes = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                         <div className="md:col-span-1">
                                             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Cor</label>
-                                            <input required type="text" placeholder="Ex: Azul Marinho" className="w-full p-2 bg-slate-950 border border-slate-700 text-white focus:border-nexus-cyan focus:outline-none font-mono text-sm"
+                                            <ColorInput
+                                                required
+                                                placeholder="Ex: Azul Marinho"
+                                                className="w-full p-2 bg-slate-950 border border-slate-700 text-white focus:border-nexus-cyan focus:outline-none font-mono text-sm"
                                                 value={item.cor}
-                                                onChange={(e) => updateColorItem(item.id, 'cor', e.target.value)}
+                                                onChange={(val) => updateColorItem(item.id, 'cor', val)}
                                             />
                                         </div>
                                         <div className="md:col-span-3">
                                             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Grade (Qtd)</label>
-                                            <div className="grid grid-cols-4 gap-2">
+                                            <div className="grid grid-cols-3 gap-2">
                                                 {item.grade.map((g, gIdx) => (
                                                     <div key={gIdx} className="relative">
                                                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500 pointer-events-none">{g.tamanho}</span>
@@ -760,15 +999,47 @@ export const Cortes = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[10px] font-bold text-nexus-cyan mb-3 uppercase tracking-wider">Conferência de Grade (Recebimento)</label>
+                                        <div className="space-y-4">
+                                            {receiveForm.itens.map((item, itemIdx) => (
+                                                <div key={itemIdx} className="bg-slate-900 border border-slate-800 p-4">
+                                                    <h5 className="text-xs font-bold text-white mb-3 uppercase flex items-center gap-2">
+                                                        <span className="w-2 h-2 rounded-full bg-nexus-cyan"></span>
+                                                        {item.cor}
+                                                    </h5>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                                        {item.gradeRecebida?.map((g, gIdx) => (
+                                                            <div key={gIdx} className="space-y-1">
+                                                                <div className="flex justify-between text-[9px] uppercase font-bold">
+                                                                    <span className="text-slate-500">{g.tamanho}</span>
+                                                                    <span className="text-nexus-cyan/50">Env: {item.grade[gIdx].quantidade}</span>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    className="w-full p-2 bg-slate-950 border border-slate-700 text-white focus:border-nexus-green focus:outline-none font-mono text-sm text-center"
+                                                                    value={g.quantidade}
+                                                                    onChange={(e) => updateReceiveGradeItem(itemIdx, gIdx, Number(e.target.value))}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label className="block text-[10px] font-bold text-nexus-cyan mb-1 uppercase tracking-wider">Data Recebimento</label>
                                         <input required type="date" className="w-full p-3 bg-slate-950 border border-slate-700 text-white focus:border-nexus-cyan focus:outline-none font-mono text-sm"
                                             value={receiveForm.dataRecebimento} onChange={e => setReceiveForm({ ...receiveForm, dataRecebimento: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-nexus-cyan mb-1 uppercase tracking-wider">Total Recebido (Peças Boas + Defeitos)</label>
-                                        <input required type="number" min="0" className="w-full p-3 bg-slate-950 border border-slate-700 text-white focus:border-nexus-cyan focus:outline-none font-mono text-sm"
-                                            value={receiveForm.qtdRecebida} onChange={e => setReceiveForm({ ...receiveForm, qtdRecebida: Number(e.target.value) })} />
+                                        <label className="block text-[10px] font-bold text-nexus-cyan mb-1 uppercase tracking-wider">Total Recebido (Calculado)</label>
+                                        <div className="w-full p-3 bg-slate-900 border border-slate-800 text-nexus-green font-mono text-lg font-bold">
+                                            {receiveForm.qtdRecebida} <span className="text-[10px] text-slate-500 uppercase ml-1">unidades</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -873,15 +1144,76 @@ export const Cortes = () => {
                                     </div>
                                 </div>
 
+                                {/* Summary: Good Pieces to Stock */}
+                                <div className="bg-gradient-to-r from-green-950/20 to-blue-950/20 p-6 border-l-4 border-green-500">
+                                    <h4 className="font-bold text-green-400 mb-4 flex items-center gap-2 uppercase tracking-wider text-sm">
+                                        <Package size={16} /> Resumo para Estoque
+                                    </h4>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-slate-900/60 p-4 border border-slate-800">
+                                            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">Total Recebido</div>
+                                            <div className="text-2xl font-bold text-white font-mono">{receiveForm.qtdRecebida}</div>
+                                        </div>
+
+                                        <div className="bg-slate-900/60 p-4 border border-slate-800">
+                                            <div className="text-[9px] text-red-400 uppercase font-bold mb-1">Total Defeitos</div>
+                                            <div className="text-2xl font-bold text-red-400 font-mono">
+                                                {Object.values(receiveForm.standardDefects).reduce((a: number, b) => a + Number(b), 0) +
+                                                    manualDefects.reduce((a, d) => a + Number(d.qty), 0)}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-green-950/40 p-4 border-2 border-green-500/50 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                                            <div className="text-[9px] text-green-400 uppercase font-bold mb-1">✓ Peças Boas (ao Estoque)</div>
+                                            <div className="text-2xl font-bold text-green-400 font-mono">
+                                                {receiveForm.qtdRecebida - (
+                                                    Object.values(receiveForm.standardDefects).reduce((a: number, b) => a + Number(b), 0) +
+                                                    manualDefects.reduce((a, d) => a + Number(d.qty), 0)
+                                                )}
+                                            </div>
+                                            <div className="text-[8px] text-green-600 mt-1 uppercase">
+                                                Apenas estas peças entrarão no estoque
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {(Object.values(receiveForm.standardDefects).reduce((a: number, b) => a + Number(b), 0) +
+                                        manualDefects.reduce((a, d) => a + Number(d.qty), 0)) === receiveForm.qtdRecebida &&
+                                        receiveForm.qtdRecebida > 0 && (
+                                            <div className="mt-4 bg-red-900/20 border border-red-500/50 p-3 rounded">
+                                                <div className="flex items-center gap-2 text-red-400 font-bold text-xs">
+                                                    <AlertCircle size={14} />
+                                                    ATENÇÃO: Todas as peças recebidas são defeituosas. Nada será adicionado ao estoque!
+                                                </div>
+                                            </div>
+                                        )}
+                                </div>
+
                                 <div>
-                                    <label className="block text-[10px] font-bold text-nexus-cyan mb-1 uppercase tracking-wider">Observações do Recebimento</label>
-                                    <textarea className="w-full p-3 bg-slate-950 border border-slate-700 text-white focus:border-nexus-cyan focus:outline-none font-mono text-sm h-20 resize-none"
-                                        value={receiveForm.observacoes} onChange={e => setReceiveForm({ ...receiveForm, observacoes: e.target.value })} />
+                                    <label className="block text-[10px] font-bold text-nexus-cyan mb-1 uppercase tracking-wider">
+                                        Observações do Recebimento
+                                        {(Object.values(receiveForm.standardDefects).reduce((a: number, b) => a + Number(b), 0) +
+                                            manualDefects.reduce((a, d) => a + Number(d.qty), 0)) > 0 && (
+                                                <span className="text-red-400 ml-2">(Obrigatório quando há defeitos)</span>
+                                            )}
+                                    </label>
+                                    <textarea
+                                        required={(Object.values(receiveForm.standardDefects).reduce((a: number, b) => a + Number(b), 0) +
+                                            manualDefects.reduce((a, d) => a + Number(d.qty), 0)) > 0}
+                                        className="w-full p-3 bg-slate-950 border border-slate-700 text-white focus:border-nexus-cyan focus:outline-none font-mono text-sm h-20 resize-none"
+                                        placeholder="Ex: 50 peças enviadas para conserto, 25 descartadas por manchas graves..."
+                                        value={receiveForm.observacoes}
+                                        onChange={e => setReceiveForm({ ...receiveForm, observacoes: e.target.value })}
+                                    />
+                                    <div className="text-[9px] text-slate-500 mt-1 uppercase">
+                                        Estas observações aparecerão no histórico da facção
+                                    </div>
                                 </div>
 
                                 <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
                                     <button type="button" onClick={() => setActiveTab('LIST')} className="px-4 py-2 text-slate-500 hover:text-white hover:bg-slate-800 uppercase text-xs font-bold tracking-wider">Cancelar</button>
-                                    <button type="submit" className="px-6 py-2 bg-nexus-green text-black hover:bg-green-400 shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-2 uppercase text-xs font-bold tracking-wider clip-path-polygon" style={{ clipPath: 'polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%)' }}>
+                                    <button type="submit" className="px-6 py-2 bg-green-600 text-white hover:bg-green-500 shadow-[0_0_15px_rgba(22,163,74,0.5)] flex items-center gap-2 uppercase text-xs font-bold tracking-wider clip-path-polygon" style={{ clipPath: 'polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%)' }}>
                                         <Save size={16} /> Finalizar Recebimento
                                     </button>
                                 </div>
@@ -1047,7 +1379,19 @@ export const Cortes = () => {
                                                 </td>
                                                 <td className="p-4 text-right font-mono text-white">{corte.qtdTotalEnviada}</td>
                                                 <td className="p-4 text-right font-mono text-white">{corte.qtdTotalRecebida}</td>
-                                                <td className="p-4 text-right font-mono text-red-400 font-bold">{corte.qtdTotalDefeitos}</td>
+                                                <td className="p-4 text-right">
+                                                    {corte.qtdTotalDefeitos > 0 ? (
+                                                        <button
+                                                            onClick={() => openDefectDetail(corte)}
+                                                            className="font-mono text-red-400 font-bold hover:text-red-300 hover:underline transition-all"
+                                                            title="Ver detalhes dos defeitos"
+                                                        >
+                                                            {corte.qtdTotalDefeitos}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="font-mono text-green-400 font-bold">0</span>
+                                                    )}
+                                                </td>
                                                 <td className="p-4 text-right font-mono text-red-400 font-bold">{defectPercent}%</td>
                                                 {isAdmin && (
                                                     <td className="p-4 text-center">
@@ -1070,6 +1414,225 @@ export const Cortes = () => {
                 </div>
             )}
 
+            {/* Detailed Defect Report Modal */}
+            {isDefectDetailOpen && selectedCorteForDefects && (
+                <div
+                    className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4"
+                    onClick={() => setIsDefectDetailOpen(false)}
+                >
+                    <div
+                        className="tech-card w-full max-w-3xl p-0 max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(239,68,68,0.3)] border-red-500/30"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
+
+                        <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-950">
+                            <div>
+                                <h3 className="text-xl font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                    <AlertCircle size={20} className="text-red-500" />
+                                    Relatório Detalhado de Defeitos
+                                </h3>
+                                <p className="text-sm text-slate-400 font-mono mt-1">
+                                    Referência: <span className="text-nexus-cyan">{selectedCorteForDefects.referencia}</span> |
+                                    Facção: <span className="text-nexus-cyan">{faccoes.find(f => f.id === selectedCorteForDefects.faccaoId)?.name}</span>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setIsDefectDetailOpen(false)}
+                                className="text-slate-500 hover:text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900/50 custom-scrollbar">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="bg-slate-900/80 p-4 border border-slate-800 rounded">
+                                    <div className="text-xs text-slate-500 uppercase font-bold mb-1">Total Recebido</div>
+                                    <div className="text-3xl font-bold text-white font-mono">{selectedCorteForDefects.qtdTotalRecebida}</div>
+                                </div>
+
+                                <div className="bg-red-950/40 p-4 border border-red-900/50 rounded">
+                                    <div className="text-xs text-red-400 uppercase font-bold mb-1">Total Defeitos</div>
+                                    <div className="text-3xl font-bold text-red-400 font-mono">{selectedCorteForDefects.qtdTotalDefeitos}</div>
+                                </div>
+
+                                <div className="bg-green-950/40 p-4 border border-green-900/50 rounded">
+                                    <div className="text-xs text-green-400 uppercase font-bold mb-1">✓ Peças Boas</div>
+                                    <div className="text-3xl font-bold text-green-400 font-mono">
+                                        {selectedCorteForDefects.qtdTotalRecebida - selectedCorteForDefects.qtdTotalDefeitos}
+                                    </div>
+                                </div>
+
+                                <div className="bg-orange-950/40 p-4 border border-orange-900/50 rounded">
+                                    <div className="text-xs text-orange-400 uppercase font-bold mb-1">% Defeitos</div>
+                                    <div className="text-3xl font-bold text-orange-400 font-mono">
+                                        {selectedCorteForDefects.qtdTotalRecebida > 0
+                                            ? ((selectedCorteForDefects.qtdTotalDefeitos / selectedCorteForDefects.qtdTotalRecebida) * 100).toFixed(1)
+                                            : '0'}%
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Alert for all defective */}
+                            {selectedCorteForDefects.qtdTotalDefeitos === selectedCorteForDefects.qtdTotalRecebida &&
+                                selectedCorteForDefects.qtdTotalRecebida > 0 && (
+                                    <div className="bg-red-900/20 border border-red-500/50 p-4 rounded flex items-start gap-3">
+                                        <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <div className="text-red-400 font-bold text-sm uppercase mb-1">ATENÇÃO CRÍTICA</div>
+                                            <div className="text-red-300 text-xs">
+                                                Todas as {selectedCorteForDefects.qtdTotalRecebida} peças recebidas são defeituosas.
+                                                Nenhuma peça foi adicionada ao estoque.
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                            {/* Defect Breakdown */}
+                            <div className="bg-gradient-to-br from-red-950/20 to-slate-900/50 p-6 border border-red-900/30 rounded">
+                                <h4 className="text-sm font-bold text-red-400 uppercase mb-4 flex items-center gap-2">
+                                    <Package size={16} />
+                                    Detalhamento por Tipo de Defeito
+                                </h4>
+
+                                {Object.keys(selectedCorteForDefects.defeitosPorTipo).length > 0 ? (
+                                    <div className="space-y-3">
+                                        {Object.entries(selectedCorteForDefects.defeitosPorTipo)
+                                            .sort((a, b) => Number(b[1]) - Number(a[1])) // Sort by quantity descending
+                                            .map(([tipo, quantidade]) => {
+                                                const percentage = selectedCorteForDefects.qtdTotalRecebida > 0
+                                                    ? ((Number(quantidade) / selectedCorteForDefects.qtdTotalRecebida) * 100).toFixed(1)
+                                                    : '0';
+
+                                                return (
+                                                    <div key={tipo} className="bg-slate-900/60 border border-slate-800 p-4 rounded hover:border-red-500/30 transition-colors">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <span className="text-white font-bold uppercase text-sm">{tipo}</span>
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="text-red-400 font-mono font-bold text-lg">{quantidade} un</span>
+                                                                <span className="text-xs text-slate-500 font-mono bg-slate-950 px-2 py-1 rounded">
+                                                                    {percentage}% do total
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Progress bar */}
+                                                        <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-500"
+                                                                style={{ width: `${percentage}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-slate-500 py-8 border border-slate-800 border-dashed rounded">
+                                        <Package className="mx-auto mb-2 opacity-50" size={32} />
+                                        <p className="text-sm">Nenhum defeito específico registrado</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Observations */}
+                            {selectedCorteForDefects.observacoesRecebimento && (
+                                <div className="bg-slate-900/60 p-6 border-l-4 border-nexus-cyan rounded">
+                                    <h4 className="text-sm font-bold text-nexus-cyan uppercase mb-3 flex items-center gap-2">
+                                        <FileText size={16} />
+                                        Observações do Recebimento
+                                    </h4>
+                                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono">
+                                        {selectedCorteForDefects.observacoesRecebimento}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Colors and Quantities Received */}
+                            <div className="bg-slate-900/60 p-6 border border-slate-800 rounded">
+                                <h4 className="text-sm font-bold text-slate-400 uppercase mb-4">
+                                    Cores e Quantidades Recebidas
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {selectedCorteForDefects.itens.map((item, idx) => (
+                                        <div key={idx} className="bg-slate-950 p-3 border border-slate-800 rounded">
+                                            <div className="text-nexus-cyan font-bold text-sm mb-2 uppercase">{item.cor}</div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {item.gradeRecebida?.map((g, gIdx) => (
+                                                    <div key={gIdx} className="text-xs bg-slate-900 px-2 py-1 rounded border border-slate-700">
+                                                        <span className="text-slate-500">{g.tamanho}:</span>
+                                                        <span className="text-white font-mono ml-1">{g.quantidade}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Dates */}
+                            <div className="bg-slate-900/60 p-4 border border-slate-800 rounded">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                    <div>
+                                        <span className="text-slate-500 uppercase font-bold block mb-1">Data de Envio</span>
+                                        <span className="text-white font-mono">{formatDate(selectedCorteForDefects.dataEnvio)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-500 uppercase font-bold block mb-1">Previsto</span>
+                                        <span className="text-white font-mono">
+                                            {selectedCorteForDefects.dataPrevistaRecebimento
+                                                ? formatDate(selectedCorteForDefects.dataPrevistaRecebimento)
+                                                : 'Não informado'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-500 uppercase font-bold block mb-1">Data de Recebimento</span>
+                                        <span className="text-green-400 font-mono">
+                                            {selectedCorteForDefects.dataRecebimento
+                                                ? formatDate(selectedCorteForDefects.dataRecebimento)
+                                                : 'Não recebido'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end">
+                            <button
+                                onClick={() => setIsDefectDetailOpen(false)}
+                                className="px-6 py-2 bg-slate-800 text-white hover:bg-slate-700 rounded uppercase text-xs font-bold tracking-wider transition-colors"
+                            >
+                                Fechar Relatório
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Grouped Modal */}
+            <GroupedCortesModal
+                isOpen={isGroupModalOpen}
+                onClose={handleCloseGroupModal}
+                faccaoName={selectedGroup?.name || ''}
+                cortes={selectedGroup?.cortes || []}
+                onReceive={(id) => {
+                    handleCloseGroupModal();
+                    setSelectedCorteId(id);
+                    setActiveTab('RECEIVE');
+                }}
+                onViewHistory={(id) => {
+                    handleCloseGroupModal();
+                    openHistory(id);
+                }}
+                onSyncStock={(id) => {
+                    handleCloseGroupModal();
+                    handleSyncStock(id);
+                }}
+            />
+
             {/* Confirm Dialog */}
             <ConfirmDialog
                 isOpen={confirmState.isOpen}
@@ -1081,6 +1644,6 @@ export const Cortes = () => {
                 cancelText={confirmState.cancelText}
                 type={confirmState.type}
             />
-        </div>
+        </div >
     );
 };

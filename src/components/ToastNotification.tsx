@@ -72,7 +72,7 @@ const ToastItem = ({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
 
 export const ToastNotification: React.FC<ToastNotificationProps> = ({ toasts, onDismiss }) => {
     // Limit to 3 toasts
-    const displayedToasts = toasts.slice(0, 3);
+    const displayedToasts = (toasts || []).slice(0, 3);
 
     return (
         <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">

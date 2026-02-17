@@ -1,0 +1,9 @@
+Testing Final URL: https://integracao.meuvesti.com/api/v1/customers/company/0fa64946-e4e6-4f43-8f3d-337f3bb7ddea?start_date=2020-01-01&end_date=2026-12-31
+STATUS: 422
+Error Body: {"result":{"success":false,"message":"Error","messages":{"start_date":["The start date does not match the format Y-m-d H:i:s."],"end_date":["The end date does not match the format Y-m-d H:i:s."]}},"statusCode":422}
+Testing Final URL: https://integracao.meuvesti.com/api/v1/customers/company/0fa64946-e4e6-4f43-8f3d-337f3bb7ddea?start_date=2020-01-01 00:00:00&end_date=2026-12-31 23:59:59
+Testing Final URL: https://integracao.meuvesti.com/api/v1/customers/company/0fa64946-e4e6-4f43-8f3d-337f3bb7ddea?start_date=2020-01-01%2000%3A00%3A00&end_date=2026-12-31%2023%3A59%3A59
+STATUS: 200
+SUCCESS! Response Body Peek:
+{"response":[{"id":"a57b9745-9154-4280-b093-6fb080a5ba2b","integration_id":null,"name":"Caio Cesar Cunha De Melo","document":"28270372000157","email":"caiocesar.cm@hotmail.com","phone":"(84) 99113-4151","instagram":"@mariiajoaquina","active":true,"profile":null,"seller":{"id":"56563f57-957e-44dd-a7a5-66e0ecf662f8","integration_id":"","name":"Marcelo  Medeiros","email":"marcelomedeiros77@hotmail.com","phone":"","domain_id":1240668,"company_id":"0fa64946-e4e6-4f43-8f3d-337f3bb7ddea"},"company_info
+JSON Keys: response, links, meta, result, statusCode

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
-interface ConfirmOptions {
+export interface ConfirmOptions {
     title: string;
     message: string;
     confirmText?: string;
@@ -8,7 +8,7 @@ interface ConfirmOptions {
     type?: 'danger' | 'warning' | 'info';
 }
 
-interface ConfirmState extends ConfirmOptions {
+export interface ConfirmState extends ConfirmOptions {
     isOpen: boolean;
     onConfirm: () => void;
 }
@@ -24,35 +24,32 @@ export const useConfirm = () => {
         onConfirm: () => { }
     });
 
-    const confirm = (options: ConfirmOptions): Promise<boolean> => {
+    const resolveRef = useRef<((value: boolean) => void) | null>(null);
+
+    const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
         return new Promise((resolve) => {
+            resolveRef.current = resolve;
             setConfirmState({
                 isOpen: true,
                 ...options,
                 onConfirm: () => {
-                    resolve(true);
+                    if (resolveRef.current) {
+                        resolveRef.current(true);
+                        resolveRef.current = null;
+                    }
                     setConfirmState(prev => ({ ...prev, isOpen: false }));
                 }
             });
-
-            // Handle cancel
-            const handleCancel = () => {
-                resolve(false);
-                setConfirmState(prev => ({ ...prev, isOpen: false }));
-            };
-
-            // Store cancel handler
-            (setConfirmState as any).cancel = handleCancel;
         });
-    };
+    }, []);
 
-    const closeDialog = () => {
-        if ((setConfirmState as any).cancel) {
-            (setConfirmState as any).cancel();
-        } else {
-            setConfirmState(prev => ({ ...prev, isOpen: false }));
+    const closeDialog = useCallback(() => {
+        if (resolveRef.current) {
+            resolveRef.current(false);
+            resolveRef.current = null;
         }
-    };
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+    }, []);
 
     return {
         confirm,

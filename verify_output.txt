@@ -1,0 +1,22 @@
+Testing Combo: Original
+[Original] Status: 401
+[Original] Body Peek: {"result":{"success":false,"message":"Error","messages":"Missing authentication token"},"statusCode":401}
+Testing Combo: Auth Bearer
+[Auth Bearer] Status: 401
+[Auth Bearer] Body Peek: {"result":{"success":false,"message":"Token error","messages":"Wrong number of segments"},"statusCode":401}
+Testing Combo: Auth Basic
+[Auth Basic] Status: 401
+[Auth Basic] Body Peek: {"result":{"success":false,"message":"Error","messages":"Missing authentication token"},"statusCode":401}
+Testing Combo: X-API-KEY
+[X-API-KEY] Status: 401
+[X-API-KEY] Body Peek: {"result":{"success":false,"message":"Error","messages":"Missing authentication token"},"statusCode":401}
+Testing Combo: apikey (lowercase)
+[apikey (lowercase)] Status: 422
+[apikey (lowercase)] Body Peek: {"result":{"success":false,"message":"Error","messages":{"start_date":["The start date field is required when none of approval date are present."],"end_date":["The end date field is required when none
+Testing Combo: apiKey (camelCase)
+[apiKey (camelCase)] Status: 422
+[apiKey (camelCase)] Body Peek: {"result":{"success":false,"message":"Error","messages":{"start_date":["The start date field is required when none of approval date are present."],"end_date":["The end date field is required when none
+Testing Combo: Api-Token
+[Api-Token] Status: 401
+[Api-Token] Body Peek: {"result":{"success":false,"message":"Error","messages":"Missing authentication token"},"statusCode":401}
+Testing Combo: Original

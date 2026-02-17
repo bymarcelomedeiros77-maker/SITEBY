@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 npm-debug.log*
-package-lock.json
 
 # Build
 dist/
@@ -33,10 +32,6 @@ Thumbs.db
 .antigravity/
 .gemini/
 .n8n-mcp/
-
-# Docs (exceto README)
-*.md
-!README.md
 
 # Git
 .git/

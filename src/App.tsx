@@ -1,16 +1,22 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Layout } from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastNotification } from './components/ToastNotification';
-import { useToast } from './hooks/useToast';
+
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Faccoes } from './pages/Faccoes';
 import { Cortes } from './pages/Cortes';
 import { Performance } from './pages/Performance';
 import { Settings } from './pages/Settings';
+import { ModuleSelection } from './pages/ModuleSelection';
+import { TechPacks } from './pages/TechPacks';
+import { Clients } from './pages/Clients';
+import { StockControl } from './pages/StockControl';
+
+import { CuttingOrders } from './pages/CuttingOrders';
 
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { user, isLoading } = useApp();
@@ -26,7 +32,7 @@ const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   if (!user) {
     return <Navigate to="/" replace />;
   }
-  return <Layout>{children}</Layout>;
+  return <>{children}</>;
 };
 
 const AppRoutes = () => {
@@ -34,10 +40,30 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route
+        path="/modules"
+        element={
+          <ProtectedRoute>
+            <ModuleSelection />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/stock"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <StockControl />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -45,7 +71,9 @@ const AppRoutes = () => {
         path="/faccoes"
         element={
           <ProtectedRoute>
-            <Faccoes />
+            <Layout>
+              <Faccoes />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -53,7 +81,9 @@ const AppRoutes = () => {
         path="/cortes"
         element={
           <ProtectedRoute>
-            <Cortes />
+            <Layout>
+              <Cortes />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -61,7 +91,9 @@ const AppRoutes = () => {
         path="/performance"
         element={
           <ProtectedRoute>
-            <Performance />
+            <Layout>
+              <Performance />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -69,7 +101,40 @@ const AppRoutes = () => {
         path="/settings"
         element={
           <ProtectedRoute>
-            <Settings />
+            <Layout>
+              <Settings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tech-packs"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TechPacks />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/clients"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Clients />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/cutting-orders"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <CuttingOrders />
+            </Layout>
           </ProtectedRoute>
         }
       />
@@ -78,7 +143,7 @@ const AppRoutes = () => {
 };
 
 const AppContent = () => {
-  const { toasts, removeToast } = useToast();
+  const { toasts, removeToast } = useApp();
 
   return (
     <>

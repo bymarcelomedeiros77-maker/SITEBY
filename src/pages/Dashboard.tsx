@@ -348,6 +348,7 @@ export const Dashboard = () => {
                   </Pie>
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
+                    itemStyle={{ color: '#f8fafc' }}
                   />
                   <Legend
                     layout="horizontal"
