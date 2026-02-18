@@ -10,18 +10,18 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
-import { vestiService } from '../services/vestiService';
+import { useVestiAPI } from '../hooks/useVestiAPI';
 
 export const Clients = () => {
     const { clientes, pedidos, devolucoes, addCliente, updateCliente, addToast } = useApp();
+    const { getClients, loading: vestiLoading } = useVestiAPI();
 
-    // UI States
+    // ... (keep existing UI states)
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<'ALL' | ClienteCategoria>('ALL');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState<Cliente | null>(null);
     const [activeTab, setActiveTab] = useState<'details' | 'address' | 'history' | 'notes'>('details');
-    const [isImporting, setIsImporting] = useState(false);
     const [importMessage, setImportMessage] = useState('');
 
     // Stats Calculation & Filtering
@@ -91,21 +91,50 @@ export const Clients = () => {
     };
 
     const handleImportVesti = async () => {
-        setIsImporting(true);
         setImportMessage("Conectando ao Vesti...");
 
         try {
-            await vestiService.syncClients((msg) => {
-                setImportMessage(msg);
-            });
-            addToast('success', "Importação concluída com sucesso!");
-            window.location.reload(); // Refresh to show new data
+            const vestiData = await getClients();
+            setImportMessage(`Processando ${vestiData.length} clientes...`);
+
+            let importedCount = 0;
+            // Adaptação dos dados vindos da API para o formato do app
+            for (const vClient of vestiData) {
+                // Lógica de mapeamento igual ao syncClients anterior, mas executada aqui ou num helper
+                const newClient: Omit<Cliente, 'id'> = {
+                    nome: vClient.name || 'Sem Nome',
+                    email: vClient.email,
+                    contato: vClient.phone || '',
+                    cidade: vClient.address?.city || vClient.cidade || '',
+                    estado: vClient.address?.state || vClient.uf || '',
+                    // Mapping default fields
+                    categoria: 'CLIENTE_NOVO',
+                    status: vClient.active ? 'ATIVO' : 'INATIVO',
+                    tags: ['VESTI_IMPORT'],
+                    ultima_compra: null,
+                    endereco: `${vClient.address?.street || ''}, ${vClient.address?.number || ''}`,
+                    bairro: vClient.address?.neighborhood || vClient.bairro || '',
+                    cep: vClient.address?.zip_code || vClient.cep || ''
+                };
+
+                // Simples verificação de duplicidade por email ou contato antes de adicionar
+                // Nota: O addCliente do context idealmente deveria tratar isso, ou fazemos check aqui
+                const exists = clientes.some(c => c.email === newClient.email || (c.contato && c.contato === newClient.contato));
+                if (!exists) {
+                    await addCliente(newClient);
+                    importedCount++;
+                }
+            }
+
+            addToast('success', `${importedCount} novos clientes importados do Vesti!`);
+            if (importedCount > 0) {
+                // Force refresh logic if needed, or rely on context update
+            }
         } catch (error: any) {
             console.error("Erro na importação:", error);
             const msg = error.message || "Falha desconhecida";
             addToast('error', `Falha ao importar: ${msg}`);
         } finally {
-            setIsImporting(false);
             setImportMessage("");
         }
     };
@@ -225,11 +254,11 @@ export const Clients = () => {
                     </label>
                     <button
                         onClick={handleImportVesti}
-                        disabled={isImporting}
+                        disabled={vestiLoading}
                         className="flex items-center gap-2 px-4 py-2 bg-brand-primary/20 text-brand-primary rounded-lg hover:bg-brand-primary/30 transition-colors disabled:opacity-50"
                     >
-                        <RotateCcw size={18} className={isImporting ? "animate-spin" : ""} />
-                        {isImporting ? importMessage || "Importando..." : "IMPORTAR VESTI"}
+                        <RotateCcw size={18} className={vestiLoading ? "animate-spin" : ""} />
+                        {vestiLoading ? importMessage || "Importando..." : "IMPORTAR VESTI"}
                     </button>
                     <button
                         onClick={downloadTemplate}

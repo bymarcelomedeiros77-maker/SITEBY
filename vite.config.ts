@@ -7,14 +7,7 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       port: 3000,
-      host: '0.0.0.0',
-      proxy: {
-        '/api/vesti': {
-          target: 'https://integracao.meuvesti.com',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/vesti/, '/api')
-        }
-      }
+      host: '0.0.0.0'
     },
     plugins: [react()],
     define: {

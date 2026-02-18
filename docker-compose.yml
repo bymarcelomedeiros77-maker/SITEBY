@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - VESTI_API_KEY=85z2hckXyE8tp59k
+      - VESTI_COMPANY_ID=0fa64946-e4e6-4f43-8f3d-337f3bb7ddea
+      - VESTI_API_URL=https://integracao.meuvesti.com
+      - NODE_ENV=production
+    restart: always
+
+#  frontend:
+#    # If you have a separate frontend image or build step, add it here.
+#    # For now, we assume the frontend is built and served separately or via another method.
