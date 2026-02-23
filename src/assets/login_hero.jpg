@@ -1,0 +1,3 @@
+// O usuário deve substituir este arquivo pela imagem de moda fornecida.
+// Este arquivo é apenas um placeholder para garantir que o import não falhe no build local caso ele não exista.
+export default "";
