@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { Fingerprint, Lock, Mail, ChevronRight, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import logo from '../assets/logo.png';
-import heroImage from '../assets/login_hero.jpg';
 
 export const Login = () => {
     const { login, user } = useApp();
@@ -179,17 +178,29 @@ export const Login = () => {
                 </div>
             </div>
 
-            {/* Right Side: Hero Image Section */}
+            {/* Right Side: Hero Section with Animated Background */}
             <div className="hidden lg:flex flex-1 relative bg-slate-950 items-center justify-center overflow-hidden">
-                {/* Background Hero Image */}
-                <div className="absolute inset-0 z-0">
-                    <img
-                        src={heroImage || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop"}
-                        alt="Fashion Background"
-                        className="w-full h-full object-cover opacity-60"
+                {/* Animated Background Orbs */}
+                <div className="absolute inset-0 z-0 bg-[#020617]">
+                    <motion.div
+                        animate={{
+                            scale: [1, 1.2, 1],
+                            x: [0, 100, 0],
+                            y: [0, 50, 0],
+                        }}
+                        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-blue-600/20 rounded-full blur-[120px]"
                     />
-                    {/* Gradient Overlay inspired by Dapic */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-brand-cyan/40 via-blue-900/60 to-slate-950/90 mix-blend-multiply"></div>
+                    <motion.div
+                        animate={{
+                            scale: [1.2, 1, 1.2],
+                            x: [0, -80, 0],
+                            y: [0, -60, 0],
+                        }}
+                        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+                        className="absolute -bottom-[20%] -right-[10%] w-[70%] h-[70%] bg-indigo-900/40 rounded-full blur-[120px]"
+                    />
+                    <div className="absolute inset-0 bg-grid opacity-[0.03]"></div>
                 </div>
 
                 {/* Content Overlay */}
@@ -208,7 +219,7 @@ export const Login = () => {
                             className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full mb-8 text-white text-xs font-black tracking-[0.3em] uppercase"
                         >
                             <span className="w-2 h-2 rounded-full bg-brand-cyan shadow-[0_0_10px_rgba(34,211,238,1)]"></span>
-                            Innovation & Style
+                            Inovação & Estilo
                         </motion.div>
 
                         <h2 className="text-5xl lg:text-7xl font-black text-white leading-none tracking-tighter mb-8 drop-shadow-2xl">
