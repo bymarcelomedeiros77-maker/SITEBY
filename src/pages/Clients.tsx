@@ -6,15 +6,15 @@ import {
     Search, Download, Plus, Phone, Mail,
     MapPin, FileText, X, Save, Trophy,
     Star, Award, Medal, Users, ChevronRight, Tags,
-    History, Info, Filter, RotateCcw
+    History, Info, Filter, RotateCcw, Calendar,
+    TrendingUp, Package, ChevronDown, ChevronUp,
+    BarChart3, ShoppingBag, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
-import { useVestiAPI } from '../hooks/useVestiAPI';
 
 export const Clients = () => {
     const { clientes, pedidos, devolucoes, addCliente, updateCliente, addToast } = useApp();
-    const { getClients, loading: vestiLoading } = useVestiAPI();
 
     // ... (keep existing UI states)
     const [searchTerm, setSearchTerm] = useState('');
@@ -22,7 +22,12 @@ export const Clients = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState<Cliente | null>(null);
     const [activeTab, setActiveTab] = useState<'details' | 'address' | 'history' | 'notes'>('details');
-    const [importMessage, setImportMessage] = useState('');
+    // Filtros da aba de Compras
+    const currentYear = new Date().getFullYear();
+    const [historyFilterYear, setHistoryFilterYear] = useState<number>(currentYear);
+    const [historyFilterMonth, setHistoryFilterMonth] = useState<number>(0); // 0 = todos
+    const [historyView, setHistoryView] = useState<'mensal' | 'referencia' | 'timeline'>('mensal');
+    const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
     // Stats Calculation & Filtering
     const processedClients = useMemo(() => {
@@ -61,10 +66,22 @@ export const Clients = () => {
                 id: '',
                 nome: '',
                 contato: '',
+                email: '',
+                cpf_cnpj: '',
+                instagram: '',
+                dataNascimento: '',
                 cidade: '',
-                categoria: 'BRONZE',
+                estado: '',
+                cep: '',
+                endereco: '',
+                numero: '',
+                complemento: '',
+                bairro: '',
+                categoria: 'CLIENTE_NOVO',
                 status: 'ATIVO',
-                tags: []
+                tags: [],
+                observacoes: '',
+                notas_internas: ''
             } as any);
         }
         setActiveTab('details');
@@ -90,54 +107,6 @@ export const Clients = () => {
         }
     };
 
-    const handleImportVesti = async () => {
-        setImportMessage("Conectando ao Vesti...");
-
-        try {
-            const vestiData = await getClients();
-            setImportMessage(`Processando ${vestiData.length} clientes...`);
-
-            let importedCount = 0;
-            // Adaptação dos dados vindos da API para o formato do app
-            for (const vClient of vestiData) {
-                // Lógica de mapeamento igual ao syncClients anterior, mas executada aqui ou num helper
-                const newClient: Omit<Cliente, 'id'> = {
-                    nome: vClient.name || 'Sem Nome',
-                    email: vClient.email,
-                    contato: vClient.phone || '',
-                    cidade: vClient.address?.city || vClient.cidade || '',
-                    estado: vClient.address?.state || vClient.uf || '',
-                    // Mapping default fields
-                    categoria: 'CLIENTE_NOVO',
-                    status: vClient.active ? 'ATIVO' : 'INATIVO',
-                    tags: ['VESTI_IMPORT'],
-                    ultima_compra: null,
-                    endereco: `${vClient.address?.street || ''}, ${vClient.address?.number || ''}`,
-                    bairro: vClient.address?.neighborhood || vClient.bairro || '',
-                    cep: vClient.address?.zip_code || vClient.cep || ''
-                };
-
-                // Simples verificação de duplicidade por email ou contato antes de adicionar
-                // Nota: O addCliente do context idealmente deveria tratar isso, ou fazemos check aqui
-                const exists = clientes.some(c => c.email === newClient.email || (c.contato && c.contato === newClient.contato));
-                if (!exists) {
-                    await addCliente(newClient);
-                    importedCount++;
-                }
-            }
-
-            addToast('success', `${importedCount} novos clientes importados do Vesti!`);
-            if (importedCount > 0) {
-                // Force refresh logic if needed, or rely on context update
-            }
-        } catch (error: any) {
-            console.error("Erro na importação:", error);
-            const msg = error.message || "Falha desconhecida";
-            addToast('error', `Falha ao importar: ${msg}`);
-        } finally {
-            setImportMessage("");
-        }
-    };
 
     const exportToExcel = () => {
         const data = processedClients.map(c => ({
@@ -252,14 +221,7 @@ export const Clients = () => {
                         </div>
                         <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} />
                     </label>
-                    <button
-                        onClick={handleImportVesti}
-                        disabled={vestiLoading}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-primary/20 text-brand-primary rounded-lg hover:bg-brand-primary/30 transition-colors disabled:opacity-50"
-                    >
-                        <RotateCcw size={18} className={vestiLoading ? "animate-spin" : ""} />
-                        {vestiLoading ? importMessage || "Importando..." : "IMPORTAR VESTI"}
-                    </button>
+
                     <button
                         onClick={downloadTemplate}
                         className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg transition-colors border border-slate-700"
@@ -350,7 +312,7 @@ export const Clients = () => {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9, y: 40 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        className="bg-slate-950 border border-slate-800 w-full max-w-4xl rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] relative z-10"
+                        className="bg-slate-950 border border-slate-800 w-full max-w-4xl rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[98vh] relative z-10"
                     >
                         {/* Modal Header */}
                         <div className="p-8 bg-slate-900/30 border-b border-slate-800 flex items-center justify-between">
@@ -403,6 +365,15 @@ export const Clients = () => {
                                             value={editingClient?.email || ''}
                                             onChange={(e) => setEditingClient({ ...editingClient!, email: e.target.value })}
                                             placeholder="exemplo@email.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] ml-2">CPF / CNPJ</label>
+                                        <input
+                                            className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-brand-cyan/50 outline-none transition-all"
+                                            value={editingClient?.cpf_cnpj || ''}
+                                            onChange={(e) => setEditingClient({ ...editingClient!, cpf_cnpj: e.target.value })}
+                                            placeholder="000.000.000-00"
                                         />
                                     </div>
                                     <div className="space-y-3">
@@ -522,145 +493,358 @@ export const Clients = () => {
                                 </div>
                             )}
 
-                            {activeTab === 'history' && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="text-white font-bold text-xs uppercase tracking-widest border-l-4 border-brand-cyan pl-3">Linha do Tempo</h3>
-                                        <span className="text-[10px] text-slate-500 font-mono">
-                                            {(pedidos || []).filter(p => p.clienteId === editingClient?.id).length} ENTRADAS | {(devolucoes || []).filter(d => d.pedido?.clienteId === editingClient?.id || pedidos.find(p => p.id === d.pedidoId)?.clienteId === editingClient?.id).length} DEVOLUÇÕES
-                                        </span>
-                                    </div>
+                            {activeTab === 'history' && (() => {
+                                const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                                const MONTHS_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-                                    {(() => {
-                                        // 1. Get Client Orders
-                                        const clientOrders = (pedidos || []).filter(p => p.clienteId === editingClient?.id).map(p => ({ ...p, type: 'PEDIDO' }));
+                                // --- Dados brutos do cliente ---
+                                const allClientOrders = (pedidos || []).filter(p => p.clienteId === editingClient?.id);
+                                const allClientReturns = (devolucoes || []).filter(d => {
+                                    if (d.pedido?.clienteId === editingClient?.id) return true;
+                                    return pedidos.find(p => p.id === d.pedidoId)?.clienteId === editingClient?.id;
+                                });
 
-                                        // 2. Get Client Returns (Check both nested pedido and lookup)
-                                        const clientReturns = (devolucoes || []).filter(d => {
-                                            if (d.pedido?.clienteId === editingClient?.id) return true;
-                                            const parentOrder = pedidos.find(p => p.id === d.pedidoId);
-                                            return parentOrder?.clienteId === editingClient?.id;
-                                        }).map(d => ({ ...d, type: 'DEVOLUCAO' }));
+                                // --- Anos disponíveis ---
+                                const availableYears: number[] = [...new Set<number>(allClientOrders.map(p => new Date(p.dataPedido).getFullYear()))].sort((a, b) => b - a);
+                                if (!availableYears.includes(currentYear)) availableYears.unshift(currentYear);
 
-                                        // 3. Merge & Sort
-                                        const historyItems = [...clientOrders, ...clientReturns].sort((a: any, b: any) => {
-                                            const dateA = new Date(a.type === 'PEDIDO' ? a.dataPedido : a.dataDevolucao).getTime();
-                                            const dateB = new Date(b.type === 'PEDIDO' ? b.dataPedido : b.dataDevolucao).getTime();
-                                            return dateB - dateA;
-                                        });
+                                // --- Filtrar pedidos pelo ano/mês selecionado ---
+                                const filteredOrders = allClientOrders.filter(p => {
+                                    const d = new Date(p.dataPedido);
+                                    const yearOk = d.getFullYear() === historyFilterYear;
+                                    const monthOk = historyFilterMonth === 0 || d.getMonth() + 1 === historyFilterMonth;
+                                    return yearOk && monthOk;
+                                });
+                                const filteredReturns = allClientReturns.filter(d => {
+                                    const devDate = new Date(d.dataDevolucao);
+                                    const yearOk = devDate.getFullYear() === historyFilterYear;
+                                    const monthOk = historyFilterMonth === 0 || devDate.getMonth() + 1 === historyFilterMonth;
+                                    return yearOk && monthOk;
+                                });
 
-                                        if (historyItems.length === 0) {
-                                            return (
-                                                <div className="py-24 text-center bg-slate-950/20 rounded-[2rem] border-2 border-dashed border-slate-800/50">
-                                                    <History className="text-slate-800 mx-auto mb-6 opacity-50" size={48} />
-                                                    <p className="text-slate-600 font-bold uppercase tracking-[0.2em] text-[10px]">Nenhuma transação encontrada</p>
-                                                    <p className="text-slate-700 text-[10px] mt-2 italic px-20">Este cliente ainda não realizou compras registradas.</p>
+                                // --- KPIs globais (ano todo) ---
+                                const yearOrders = allClientOrders.filter(p => new Date(p.dataPedido).getFullYear() === historyFilterYear);
+                                const totalPecasAno = yearOrders.reduce((acc, p) => acc + (p.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0), 0);
+                                const totalDevPecas = allClientReturns.filter(d => new Date(d.dataDevolucao).getFullYear() === historyFilterYear)
+                                    .reduce((acc, d) => acc + (d.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0), 0);
+                                const allDatesOrdered = allClientOrders.map(p => new Date(p.dataPedido)).sort((a, b) => b.getTime() - a.getTime());
+                                const ultimaCompra = allDatesOrdered[0];
+
+                                // --- Referências únicas no ano ---
+                                const refSet = new Set<string>();
+                                yearOrders.forEach(p => p.itens?.forEach((i: any) => { if (i.sku?.produto?.referencia) refSet.add(i.sku.produto.referencia); }));
+
+                                // --- Agrupamento mensal ---
+                                type MonthGroup = { month: number; label: string; short: string; pedidos: typeof filteredOrders; totalPecas: number; devPecas: number; };
+                                const monthGroupsMap: Record<number, MonthGroup> = {};
+                                filteredOrders.forEach(p => {
+                                    const m = new Date(p.dataPedido).getMonth();
+                                    if (!monthGroupsMap[m]) monthGroupsMap[m] = { month: m, label: MONTHS_FULL[m], short: MONTHS_PT[m], pedidos: [], totalPecas: 0, devPecas: 0 };
+                                    const pecas = p.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0;
+                                    monthGroupsMap[m].pedidos.push(p);
+                                    monthGroupsMap[m].totalPecas += pecas;
+                                });
+                                filteredReturns.forEach(d => {
+                                    const m = new Date(d.dataDevolucao).getMonth();
+                                    if (monthGroupsMap[m]) monthGroupsMap[m].devPecas += d.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0;
+                                });
+                                const monthGroups = Object.values(monthGroupsMap).sort((a, b) => b.month - a.month);
+
+                                // --- Agrupamento por referência ---
+                                type RefGroup = { ref: string; totalPecas: number; pedidosNums: number[]; meses: Set<number>; };
+                                const refGroupsMap: Record<string, RefGroup> = {};
+                                filteredOrders.forEach(p => {
+                                    const m = new Date(p.dataPedido).getMonth();
+                                    p.itens?.forEach((i: any) => {
+                                        const ref = i.sku?.produto?.referencia || 'S/REF';
+                                        if (!refGroupsMap[ref]) refGroupsMap[ref] = { ref, totalPecas: 0, pedidosNums: [], meses: new Set() };
+                                        refGroupsMap[ref].totalPecas += i.quantidade;
+                                        if (!refGroupsMap[ref].pedidosNums.includes(p.numero)) refGroupsMap[ref].pedidosNums.push(p.numero);
+                                        refGroupsMap[ref].meses.add(m);
+                                    });
+                                });
+                                const refGroups = Object.values(refGroupsMap).sort((a, b) => b.totalPecas - a.totalPecas);
+
+                                const toggleMonth = (key: string) => {
+                                    setExpandedMonths(prev => {
+                                        const next = new Set(prev);
+                                        next.has(key) ? next.delete(key) : next.add(key);
+                                        return next;
+                                    });
+                                };
+
+                                return (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+                                        {/* ── KPI cards ── */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-slate-500"><Clock size={12} /><span className="text-[9px] uppercase tracking-widest font-bold">Última Compra</span></div>
+                                                <div className="text-white font-bold text-sm font-mono">
+                                                    {ultimaCompra ? ultimaCompra.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
                                                 </div>
-                                            );
-                                        }
+                                                <div className="text-[9px] text-slate-600 font-mono uppercase">
+                                                    {ultimaCompra ? `há ${Math.floor((Date.now() - ultimaCompra.getTime()) / 86400000)} dias` : 'sem registro'}
+                                                </div>
+                                            </div>
+                                            <div className="bg-brand-cyan/5 border border-brand-cyan/20 rounded-2xl p-4 flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-brand-cyan/60"><ShoppingBag size={12} /><span className="text-[9px] uppercase tracking-widest font-bold text-brand-cyan/70">Peças {historyFilterYear}</span></div>
+                                                <div className="text-brand-cyan font-bold text-sm font-mono">{totalPecasAno} <span className="text-[9px] text-brand-cyan/50">UN</span></div>
+                                                <div className="text-[9px] text-slate-600 font-mono uppercase">{yearOrders.length} pedidos</div>
+                                            </div>
+                                            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-slate-500"><Package size={12} /><span className="text-[9px] uppercase tracking-widest font-bold">Referências</span></div>
+                                                <div className="text-white font-bold text-sm font-mono">{refSet.size}</div>
+                                                <div className="text-[9px] text-slate-600 font-mono uppercase">no ano {historyFilterYear}</div>
+                                            </div>
+                                            <div className="bg-red-900/10 border border-red-500/20 rounded-2xl p-4 flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 text-red-400/60"><RotateCcw size={12} /><span className="text-[9px] uppercase tracking-widest font-bold text-red-400/70">Devoluções</span></div>
+                                                <div className="text-red-400 font-bold text-sm font-mono">{totalDevPecas} <span className="text-[9px] text-red-400/50">UN</span></div>
+                                                <div className="text-[9px] text-slate-600 font-mono uppercase">{allClientReturns.filter(d => new Date(d.dataDevolucao).getFullYear() === historyFilterYear).length} ocorrências</div>
+                                            </div>
+                                        </div>
 
-                                        return (
-                                            <div className="space-y-4">
-                                                {historyItems.map((item: any) => (
-                                                    item.type === 'PEDIDO' ? (
-                                                        // RENDER PEDIDO
-                                                        <div key={`ped-${item.id}`} className="bg-slate-900/30 border border-slate-800/80 rounded-[1.5rem] p-5 flex flex-col gap-4 group hover:border-slate-700 transition-all">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-5">
-                                                                    <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-slate-500 group-hover:text-brand-cyan transition-all group-hover:scale-110 shadow-inner">
-                                                                        <History size={20} />
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="text-sm font-bold text-white uppercase font-mono tracking-tight">Venda #{item.numero}</div>
-                                                                        <div className="text-[10px] text-slate-500 font-mono mt-1 uppercase">{new Date(item.dataPedido).toLocaleDateString()} — {item.status}</div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <div className="text-xs font-bold text-brand-green font-mono uppercase">
-                                                                        {item.itens?.reduce((acc: number, curr: any) => acc + curr.quantidade, 0) || 0} Peças
-                                                                    </div>
-                                                                    <div className="text-[9px] text-slate-600 uppercase mt-1">Status Sincronizado</div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Items List */}
-                                                            {item.itens && item.itens.length > 0 && (
-                                                                <div className="space-y-2 border-t border-slate-800/50 pt-4">
-                                                                    <div className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2 font-mono">Peças do Pedido</div>
-                                                                    <div className="grid grid-cols-1 gap-2">
-                                                                        {item.itens.map((i: any, idx: number) => (
-                                                                            <div key={idx} className="flex items-center justify-between text-[11px] bg-slate-950/40 p-2 rounded-lg border border-slate-800/30">
-                                                                                <div className="flex gap-2 items-center">
-                                                                                    <span className="text-brand-cyan font-bold font-mono">{i.sku?.produto?.referencia}</span>
-                                                                                    <span className="text-slate-500">—</span>
-                                                                                    <span className="text-slate-400 capitalize">{i.sku?.cor?.nome} / {i.sku?.tamanho?.nome}</span>
-                                                                                </div>
-                                                                                <div className="font-bold text-white font-mono">{i.quantidade} <span className="text-[9px] text-slate-600 uppercase">UN</span></div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        // RENDER DEVOLUCAO
-                                                        <div key={`dev-${item.id}`} className="bg-red-900/10 border border-red-500/20 rounded-[1.5rem] p-5 flex flex-col gap-4 group hover:border-red-500/40 transition-all">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-5">
-                                                                    <div className="w-12 h-12 rounded-2xl bg-red-900/20 flex items-center justify-center text-red-500 group-hover:scale-110 transition-all shadow-inner">
-                                                                        <RotateCcw size={20} />
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="text-sm font-bold text-white uppercase font-mono tracking-tight flex items-center gap-2">
-                                                                            Devolução #{item.numero}
-                                                                            <span className="px-2 py-0.5 rounded text-[9px] bg-red-500/20 text-red-400 border border-red-500/30">ESTORNO</span>
-                                                                        </div>
-                                                                        <div className="text-[10px] text-red-400/70 font-mono mt-1 uppercase">
-                                                                            {new Date(item.dataDevolucao).toLocaleDateString()} — Ref. Pedido #{item.pedido?.numero || '?'}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <div className="text-xs font-bold text-red-400 font-mono uppercase">
-                                                                        -{item.itens?.reduce((acc: number, curr: any) => acc + curr.quantidade, 0) || 0} Peças
-                                                                    </div>
-                                                                    <div className="text-[9px] text-red-500/50 uppercase mt-1">Estoque Reposto</div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Motivo */}
-                                                            {item.motivo && (
-                                                                <div className="bg-red-950/30 p-3 rounded-lg border border-red-900/30 text-[11px] text-red-200/80 italic">
-                                                                    "{item.motivo}"
-                                                                </div>
-                                                            )}
-
-                                                            {/* Items List */}
-                                                            {item.itens && item.itens.length > 0 && (
-                                                                <div className="space-y-2 border-t border-red-900/20 pt-4">
-                                                                    <div className="text-[9px] font-bold text-red-800 uppercase tracking-widest mb-2 font-mono">Itens Devolvidos</div>
-                                                                    <div className="grid grid-cols-1 gap-2">
-                                                                        {item.itens.map((i: any, idx: number) => (
-                                                                            <div key={idx} className="flex items-center justify-between text-[11px] bg-red-950/20 p-2 rounded-lg border border-red-900/20">
-                                                                                <div className="flex gap-2 items-center">
-                                                                                    <span className="text-red-400 font-bold font-mono">{i.sku?.produto?.referencia}</span>
-                                                                                    <span className="text-red-800">—</span>
-                                                                                    <span className="text-red-300 capitalize">{i.sku?.cor?.nome} / {i.sku?.tamanho?.nome}</span>
-                                                                                </div>
-                                                                                <div className="font-bold text-white font-mono">{i.quantidade} <span className="text-[9px] text-red-500 uppercase">UN</span></div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )
+                                        {/* ── Filtros ── */}
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            {/* Seletor de Ano */}
+                                            <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-2.5 flex-1">
+                                                <Calendar size={14} className="text-slate-500" />
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ano:</span>
+                                                <div className="flex gap-1 ml-auto">
+                                                    {availableYears.map(y => (
+                                                        <button type="button" key={y} onClick={() => { setHistoryFilterYear(y); setHistoryFilterMonth(0); }}
+                                                            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${historyFilterYear === y ? 'bg-brand-cyan text-slate-950' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                                            {y}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {/* Seletor de Visão */}
+                                            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-xl p-1">
+                                                {([['mensal', BarChart3, 'Mensal'], ['referencia', Package, 'Referência'], ['timeline', History, 'Timeline']] as const).map(([v, Icon, label]) => (
+                                                    <button type="button" key={v} onClick={() => setHistoryView(v as any)}
+                                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${historyView === v ? 'bg-brand-cyan/20 text-brand-cyan' : 'text-slate-500 hover:text-white'}`}>
+                                                        <Icon size={12} />{label}
+                                                    </button>
                                                 ))}
                                             </div>
-                                        );
-                                    })()}
-                                </div>
-                            )}
+                                        </div>
+
+                                        {/* ── Filtro de mês ── */}
+                                        <div className="flex gap-1.5 flex-wrap">
+                                            <button type="button" onClick={() => setHistoryFilterMonth(0)}
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all border ${historyFilterMonth === 0 ? 'bg-slate-700 border-slate-600 text-white' : 'border-slate-800 text-slate-500 hover:text-white hover:border-slate-700'}`}>
+                                                Todos
+                                            </button>
+                                            {MONTHS_PT.map((m, idx) => {
+                                                const mNum = idx + 1;
+                                                const hasPedido = allClientOrders.some(p => new Date(p.dataPedido).getFullYear() === historyFilterYear && new Date(p.dataPedido).getMonth() === idx);
+                                                return (
+                                                    <button type="button" key={m} onClick={() => setHistoryFilterMonth(mNum)}
+                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all border relative ${historyFilterMonth === mNum ? 'bg-brand-cyan text-slate-950 border-brand-cyan' : hasPedido ? 'border-slate-700 text-slate-300 hover:border-brand-cyan/50 hover:text-white' : 'border-slate-800/50 text-slate-600 cursor-default'}`}>
+                                                        {m}
+                                                        {hasPedido && historyFilterMonth !== mNum && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-brand-cyan" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* ── Conteúdo por visão ── */}
+                                        {filteredOrders.length === 0 ? (
+                                            <div className="py-16 text-center bg-slate-950/20 rounded-[2rem] border-2 border-dashed border-slate-800/50">
+                                                <History className="text-slate-800 mx-auto mb-4 opacity-50" size={40} />
+                                                <p className="text-slate-600 font-bold uppercase tracking-[0.2em] text-[10px]">Nenhuma compra encontrada</p>
+                                                <p className="text-slate-700 text-[10px] mt-2 italic">
+                                                    {historyFilterMonth > 0 ? `Sem pedidos em ${MONTHS_FULL[historyFilterMonth - 1]} de ${historyFilterYear}` : `Sem pedidos registrados em ${historyFilterYear}`}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {/* VISÃO MENSAL */}
+                                                {historyView === 'mensal' && (
+                                                    <div className="space-y-3">
+                                                        {monthGroups.map(mg => {
+                                                            const key = `${historyFilterYear}-${mg.month}`;
+                                                            const isOpen = expandedMonths.has(key);
+                                                            return (
+                                                                <div key={key} className="border border-slate-800 rounded-2xl overflow-hidden">
+                                                                    {/* Header do mês — clicável */}
+                                                                    <button type="button" onClick={() => toggleMonth(key)} className="w-full flex items-center justify-between px-5 py-4 bg-slate-900/50 hover:bg-slate-900 transition-all group">
+                                                                        <div className="flex items-center gap-4">
+                                                                            <div className="w-10 h-10 rounded-xl bg-brand-cyan/10 border border-brand-cyan/20 flex items-center justify-center">
+                                                                                <span className="text-brand-cyan text-[9px] font-bold uppercase">{mg.short}</span>
+                                                                            </div>
+                                                                            <div className="text-left">
+                                                                                <div className="text-white text-xs font-bold uppercase tracking-wide">{mg.label} {historyFilterYear}</div>
+                                                                                <div className="text-slate-500 text-[10px] font-mono mt-0.5">{mg.pedidos.length} pedido{mg.pedidos.length !== 1 ? 's' : ''}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4">
+                                                                            {mg.devPecas > 0 && (
+                                                                                <span className="text-red-400 text-[10px] font-bold font-mono">-{mg.devPecas} dev</span>
+                                                                            )}
+                                                                            <div className="text-right">
+                                                                                <div className="text-brand-cyan font-bold text-sm font-mono">{mg.totalPecas} <span className="text-[9px] text-brand-cyan/50">UN</span></div>
+                                                                                <div className="text-[9px] text-slate-600 uppercase">total peças</div>
+                                                                            </div>
+                                                                            <div className={`text-slate-500 group-hover:text-white transition-all ${isOpen ? 'rotate-180' : ''}`}>
+                                                                                <ChevronDown size={16} />
+                                                                            </div>
+                                                                        </div>
+                                                                    </button>
+
+                                                                    {/* Accordion: pedidos do mês */}
+                                                                    {isOpen && (
+                                                                        <div className="px-5 py-4 space-y-3 bg-slate-950/30">
+                                                                            {mg.pedidos.map((ped: any) => {
+                                                                                const pedPecas = ped.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0;
+                                                                                // Agrupa por referência dentro do pedido
+                                                                                const pedRefs: Record<string, { nome: string, total: number, itens: any[] }> = {};
+                                                                                ped.itens?.forEach((i: any) => {
+                                                                                    const ref = i.sku?.produto?.referencia || 'S/REF';
+                                                                                    if (!pedRefs[ref]) pedRefs[ref] = { nome: ref, total: 0, itens: [] };
+                                                                                    pedRefs[ref].total += i.quantidade;
+                                                                                    pedRefs[ref].itens.push(i);
+                                                                                });
+                                                                                return (
+                                                                                    <div key={ped.id} className="bg-slate-900/60 border border-slate-800/50 rounded-xl p-4">
+                                                                                        <div className="flex items-center justify-between mb-3">
+                                                                                            <div>
+                                                                                                <div className="text-white text-xs font-bold font-mono uppercase">Pedido #{ped.numero}</div>
+                                                                                                <div className="text-slate-500 text-[10px] font-mono mt-0.5">
+                                                                                                    {new Date(ped.dataPedido).toLocaleDateString('pt-BR')} · <span className={`${ped.status === 'EXPEDIDO' ? 'text-green-400' : ped.status === 'CANCELADO' ? 'text-red-400' : 'text-amber-400'}`}>{ped.status}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="text-brand-cyan font-bold text-sm font-mono">{pedPecas} <span className="text-[9px] text-slate-500">UN</span></div>
+                                                                                        </div>
+                                                                                        {/* Breakdown por referência */}
+                                                                                        {Object.values(pedRefs).length > 0 && (
+                                                                                            <div className="space-y-1.5 border-t border-slate-800/40 pt-3">
+                                                                                                {Object.values(pedRefs).map((rg, ri) => (
+                                                                                                    <div key={ri} className="flex items-center justify-between text-[10px]">
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-cyan/40" />
+                                                                                                            <span className="text-brand-cyan font-bold font-mono">{rg.nome}</span>
+                                                                                                            <span className="text-slate-600">·</span>
+                                                                                                            <span className="text-slate-400">{rg.itens.map((i: any) => `${i.sku?.cor?.nome || ''} ${i.sku?.tamanho?.nome || ''}`).join(', ')}</span>
+                                                                                                        </div>
+                                                                                                        <span className="text-white font-bold font-mono">{rg.total} <span className="text-slate-600">UN</span></span>
+                                                                                                    </div>
+                                                                                                ))}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                            {/* Devoluções do mês */}
+                                                                            {filteredReturns.filter(d => new Date(d.dataDevolucao).getMonth() === mg.month).map(dev => (
+                                                                                <div key={dev.id} className="bg-red-900/10 border border-red-500/20 rounded-xl p-3 flex items-center justify-between">
+                                                                                    <div>
+                                                                                        <div className="text-red-400 text-[10px] font-bold font-mono uppercase flex items-center gap-2">
+                                                                                            <RotateCcw size={10} /> Devolução #{dev.numero}
+                                                                                            <span className="text-red-900 text-[9px]">Ref. Pedido #{dev.pedido?.numero || '?'}</span>
+                                                                                        </div>
+                                                                                        <div className="text-red-400/60 text-[9px] font-mono mt-0.5">{new Date(dev.dataDevolucao).toLocaleDateString('pt-BR')} · {dev.motivo || 'Sem motivo'}</div>
+                                                                                    </div>
+                                                                                    <div className="text-red-400 font-bold text-xs font-mono">-{dev.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0} UN</div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {/* VISÃO POR REFERÊNCIA */}
+                                                {historyView === 'referencia' && (
+                                                    <div className="space-y-2">
+                                                        <div className="grid grid-cols-3 px-4 py-2 text-[9px] text-slate-600 uppercase tracking-widest font-bold border-b border-slate-800">
+                                                            <span>Referência</span><span className="text-center">Pedidos</span><span className="text-right">Total Peças</span>
+                                                        </div>
+                                                        {refGroups.map((rg, i) => (
+                                                            <div key={rg.ref} className="group grid grid-cols-3 items-center px-4 py-3 rounded-xl bg-slate-900/40 border border-slate-800/60 hover:border-slate-700 transition-all">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-7 h-7 rounded-lg bg-brand-cyan/10 border border-brand-cyan/20 flex items-center justify-center text-brand-cyan text-[9px] font-bold">{i + 1}</div>
+                                                                    <div>
+                                                                        <div className="text-brand-cyan font-bold text-xs font-mono">{rg.ref}</div>
+                                                                        <div className="text-slate-600 text-[9px] font-mono mt-0.5">
+                                                                            {Array.from(rg.meses).map(m => MONTHS_PT[m]).join(', ')}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-center text-slate-300 text-xs font-mono">
+                                                                    {rg.pedidosNums.map(n => `#${n}`).join(', ')}
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <span className="text-white font-bold text-sm font-mono">{rg.totalPecas}</span>
+                                                                    <span className="text-slate-600 text-[9px] ml-1">UN</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {/* Totalizador */}
+                                                        <div className="grid grid-cols-3 items-center px-4 py-3 rounded-xl bg-brand-cyan/5 border border-brand-cyan/20 mt-2">
+                                                            <div className="text-brand-cyan text-[10px] font-bold uppercase tracking-wider flex items-center gap-2"><TrendingUp size={12} />Total</div>
+                                                            <div className="text-center text-slate-300 text-[10px] font-mono">{filteredOrders.length} pedidos</div>
+                                                            <div className="text-right text-brand-cyan font-bold text-sm font-mono">{filteredOrders.reduce((acc, p) => acc + (p.itens?.reduce((s: number, i: any) => s + i.quantidade, 0) || 0), 0)} <span className="text-[9px] text-brand-cyan/50">UN</span></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* VISÃO TIMELINE */}
+                                                {historyView === 'timeline' && (
+                                                    <div className="space-y-3">
+                                                        {[...filteredOrders.map((p: any) => ({ ...p, _type: 'PEDIDO' })), ...filteredReturns.map((d: any) => ({ ...d, _type: 'DEV' }))]
+                                                            .sort((a: any, b: any) => new Date(a._type === 'PEDIDO' ? a.dataPedido : a.dataDevolucao).getTime() < new Date(b._type === 'PEDIDO' ? b.dataPedido : b.dataDevolucao).getTime() ? 1 : -1)
+                                                            .map((item: any, idx) => item._type === 'PEDIDO' ? (
+                                                                <div key={`t-ped-${item.id}`} className="flex gap-4">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-400"><History size={14} /></div>
+                                                                        {idx < filteredOrders.length + filteredReturns.length - 1 && <div className="w-px flex-1 bg-slate-800 mt-1" />}
+                                                                    </div>
+                                                                    <div className="flex-1 pb-4">
+                                                                        <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
+                                                                            <div className="flex items-center justify-between mb-2">
+                                                                                <div className="text-white text-xs font-bold font-mono">Pedido #{item.numero}</div>
+                                                                                <div className="text-[10px] text-slate-500 font-mono">{new Date(item.dataPedido).toLocaleDateString('pt-BR')}</div>
+                                                                            </div>
+                                                                            <div className="flex flex-wrap gap-1.5">
+                                                                                {item.itens?.map((i: any, ii: number) => (
+                                                                                    <span key={ii} className="text-[9px] bg-slate-800 border border-slate-700 rounded-md px-2 py-0.5 text-slate-300 font-mono">
+                                                                                        {i.sku?.produto?.referencia} · {i.quantidade}UN
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div key={`t-dev-${item.id}`} className="flex gap-4">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <div className="w-8 h-8 rounded-xl bg-red-900/20 border border-red-500/20 flex items-center justify-center text-red-400"><RotateCcw size={14} /></div>
+                                                                        {idx < filteredOrders.length + filteredReturns.length - 1 && <div className="w-px flex-1 bg-slate-800 mt-1" />}
+                                                                    </div>
+                                                                    <div className="flex-1 pb-4">
+                                                                        <div className="bg-red-900/10 border border-red-500/20 rounded-xl p-4">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <div className="text-red-400 text-xs font-bold font-mono flex items-center gap-2">Devolução #{item.numero}<span className="bg-red-500/20 text-red-400 border border-red-500/30 text-[8px] px-2 py-0.5 rounded">ESTORNO</span></div>
+                                                                                <div className="text-[10px] text-slate-500 font-mono">{new Date(item.dataDevolucao).toLocaleDateString('pt-BR')}</div>
+                                                                            </div>
+                                                                            {item.motivo && <div className="text-red-200/60 text-[10px] italic mt-1">"{item.motivo}"</div>}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        }
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
 
                             {activeTab === 'notes' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -671,8 +855,8 @@ export const Clients = () => {
                                         </div>
                                         <textarea
                                             className="w-full bg-slate-900/50 border border-slate-800 rounded-3xl px-6 py-5 text-sm text-white focus:border-brand-cyan/50 outline-none transition-all h-32 resize-none shadow-inner"
-                                            value={editingClient?.observacoes_vesti || ''}
-                                            onChange={(e) => setEditingClient({ ...editingClient!, observacoes_vesti: e.target.value })}
+                                            value={editingClient?.observacoes || ''}
+                                            onChange={(e) => setEditingClient({ ...editingClient!, observacoes: e.target.value })}
                                             placeholder="Descreva preferências, histórico informal ou detalhes úteis..."
                                         />
                                     </div>

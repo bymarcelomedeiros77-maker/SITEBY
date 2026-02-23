@@ -42,6 +42,10 @@ interface AppContextType {
   fichas: FichaTecnica[];
   regrasConsumo: RegraConsumo[];
 
+  // Cliente Actions
+  addCliente: (cliente: Omit<Cliente, 'id'>) => Promise<any>;
+  updateCliente: (cliente: Cliente) => Promise<void>;
+
   // Actions
   fetchUsers: () => Promise<void>;
   addPedido: (pedido: Omit<Pedido, 'id' | 'numero' | 'cliente'>) => Promise<boolean>;
@@ -698,8 +702,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       email: cliente.email,
       cidade: cliente.cidade,
       contato: cliente.contato,
+      cpf_cnpj: cliente.cpf_cnpj,
       instagram: cliente.instagram,
-      data_nascimento: cliente.dataNascimento,
+      data_nascimento: cliente.dataNascimento || null,
       status: cliente.status,
       categoria: cliente.categoria,
       cep: cliente.cep,
@@ -708,8 +713,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       complemento: cliente.complemento,
       bairro: cliente.bairro,
       estado: cliente.estado,
-      tags: cliente.tags,
-      observacoes_vesti: cliente.observacoes_vesti,
+      tags: cliente.tags || [],
+      observacoes: cliente.observacoes,
       notas_internas: cliente.notas_internas
     }).select();
 
@@ -728,8 +733,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       email: cliente.email,
       cidade: cliente.cidade,
       contato: cliente.contato,
+      cpf_cnpj: cliente.cpf_cnpj,
       instagram: cliente.instagram,
-      data_nascimento: cliente.dataNascimento,
+      data_nascimento: cliente.dataNascimento || null,
       status: cliente.status,
       categoria: cliente.categoria,
       cep: cliente.cep,
@@ -738,9 +744,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       complemento: cliente.complemento,
       bairro: cliente.bairro,
       estado: cliente.estado,
-      observacoes_vesti: cliente.observacoes_vesti,
+      observacoes: cliente.observacoes,
       notas_internas: cliente.notas_internas,
-      tags: cliente.tags
+      tags: cliente.tags || []
     }).eq('id', cliente.id);
 
     if (error) {
@@ -1468,7 +1474,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       removeToast,
 
       // Actions
-      fetchUsers
+      fetchUsers,
+      addCliente,
+      updateCliente,
     }}>
       {children}
       < ConfirmDialog

@@ -113,15 +113,12 @@ export type ClienteCategoria = 'DIAMANTE' | 'OURO' | 'PRATA' | 'BRONZE' | 'INATI
 
 export interface Cliente {
   id: string;
-  vesti_id?: string; // ID Vesti
   nome: string;
   email?: string;
   cpf_cnpj?: string; // CPF ou CNPJ
-  rg_ie?: string; // RG ou Inscrição Estadual
-  site?: string;
   contato: string;
-  instagram?: string; // Novo campo
-  dataNascimento?: string; // Novo campo
+  instagram?: string;
+  dataNascimento?: string;
   cidade: string;
   estado?: string;
   cep?: string;
@@ -131,7 +128,7 @@ export interface Cliente {
   bairro?: string;
   categoria: ClienteCategoria;
   status: 'ATIVO' | 'INATIVO';
-  observacoes_vesti?: string;
+  observacoes?: string;
   notas_internas?: string;
   tags?: string[];
   ultima_compra?: string;
