@@ -15,6 +15,7 @@ import { StockAjustes } from './stock-tabs/StockAjustes';
 import StockDashboard from './stock-tabs/StockDashboard';
 import { StockMovimentacoes } from './stock-tabs/StockMovimentacoes';
 import { StockList } from './stock-tabs/StockList';
+import { StockCadastros } from './stock-tabs/StockCadastros';
 
 export const StockControl = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -35,6 +36,7 @@ export const StockControl = () => {
         { id: 'H', label: 'Painel Geral', icon: <BarChart2 size={18} /> },
         { id: 'I', label: 'Histórico', icon: <History size={18} /> },
         { id: 'J', label: 'Estoque Detalhado', icon: <Boxes size={18} /> },
+        { id: 'C', label: 'Cadastros (Produtos)', icon: <Layers size={18} /> },
         { id: 'B', label: 'Estoque Inicial', icon: <Package size={18} /> },
         { id: 'D', label: 'Pedidos', icon: <ShoppingCart size={18} /> },
         { id: 'E', label: 'Produção', icon: <ClipboardList size={18} /> },
@@ -90,6 +92,7 @@ export const StockControl = () => {
                         {activeTab === 'J' && <StockList />}
                         {activeTab === 'I' && <StockMovimentacoes />}
                         {activeTab === 'B' && <StockEstoqueInicial />}
+                        {activeTab === 'C' && <StockCadastros />}
                         {activeTab === 'D' && <StockPedidos />}
                         {activeTab === 'E' && <StockProducao />}
                         {activeTab === 'F' && <StockDevolucoes />}

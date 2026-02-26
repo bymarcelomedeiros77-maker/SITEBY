@@ -70,6 +70,7 @@ export interface Corte {
   defeitosPorTipo: Record<string, number>; // { "Mancha": 2, "Furo": 1, "Novo Defeito Manual": 5 }
   observacoesRecebimento?: string;
   sincronizadoEm?: string; // ISO Date - When it was synced to stock
+  valor_por_peca?: number; // Custo de mão de obra por peça
 }
 
 export interface DefectType {
@@ -134,6 +135,8 @@ export interface Cliente {
   ultima_compra?: string;
   total_compras?: number;
   contagem_pedidos?: number;
+  lat?: number;
+  lng?: number;
   createdAt?: string;
 }
 
@@ -295,4 +298,48 @@ export interface RegraConsumo {
 
   // Joined fields
   tamanho?: Tamanho;
+}
+
+export interface Colecao {
+  id: string;
+  nome: string;
+  dataInicio?: string;
+  dataTermino?: string;
+  meta_vendas?: number;
+}
+
+export interface CompraCampanha {
+  id: string;
+  clienteId: string;
+  colecaoId: string;
+  referencia: string;
+  quantidade: number;
+  valorTotal?: number;
+  dataCompra: string;
+}
+
+export interface FinancialEntry {
+  id: string;
+  tipo: 'ENTRADA' | 'SAIDA';
+  descricao: string;
+  valor: number;
+  categoria: 'VENDA' | 'FACCAO' | 'INSUMO' | 'DESPESA' | 'OUTRO';
+  data: string;
+  observacao?: string;
+  created_at?: string;
+}
+
+export interface Supplier {
+  id: string;
+  nome: string;
+  cnpj_cpf?: string;
+  contato?: string;
+  email?: string;
+  cidade?: string;
+  estado?: string;
+  produto?: string;
+  observacao?: string;
+  avaliacao: number;
+  ativo: boolean;
+  created_at?: string;
 }

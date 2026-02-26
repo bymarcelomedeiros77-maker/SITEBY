@@ -13,7 +13,9 @@ import {
     LayoutGrid,
     ClipboardList,
     Trophy,
-    Target
+    Target,
+    DollarSign,
+    Truck
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 
@@ -91,6 +93,28 @@ export const ModuleSelection = () => {
             icon: <Scissors size={40} />,
             path: '/cutting-orders',
             color: 'from-amber-600 to-orange-700',
+            bgGlow: 'bg-orange-600/20',
+            iconColor: 'text-orange-500'
+        },
+        {
+            id: 'financeiro',
+            title: 'Financeiro',
+            subtitle: 'Fluxo de Caixa',
+            description: 'Controle de entradas, saídas e movimentações financeiras.',
+            icon: <DollarSign size={40} />,
+            path: '/financeiro',
+            color: 'from-emerald-600 to-teal-700',
+            bgGlow: 'bg-emerald-600/20',
+            iconColor: 'text-emerald-500'
+        },
+        {
+            id: 'fornecedores',
+            title: 'Fornecedores',
+            subtitle: 'Insumos',
+            description: 'Gestão de fornecedores de tecidos, aviamentos e serviços.',
+            icon: <Truck size={40} />,
+            path: '/fornecedores',
+            color: 'from-orange-600 to-amber-700',
             bgGlow: 'bg-orange-600/20',
             iconColor: 'text-orange-500'
         }

@@ -669,9 +669,10 @@ export const Cortes = () => {
                                     );
                                 } else {
                                     const c = group.cortes[0];
+                                    const isOverdue = c.status !== CorteStatus.RECEBIDO && c.dataPrevistaRecebimento && new Date(c.dataPrevistaRecebimento) < new Date();
                                     return (
-                                        <div key={c.id} className="tech-card p-4 relative group border border-slate-800 bg-slate-900/80">
-                                            <div className="absolute top-0 left-0 w-1 h-full bg-nexus-cyan opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                                        <div key={c.id} className={`tech-card p-4 relative group border ${isOverdue ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-slate-800'} bg-slate-900/80`}>
+                                            <div className={`absolute top-0 left-0 w-1 h-full ${isOverdue ? 'bg-red-500 animate-pulse' : 'bg-nexus-cyan opacity-50 group-hover:opacity-100'} transition-opacity`}></div>
 
                                             <div className="flex justify-between items-start mb-3 pl-3">
                                                 <div>
@@ -772,8 +773,9 @@ export const Cortes = () => {
                                             );
                                         } else {
                                             const c = group.cortes[0];
+                                            const isOverdue = c.status !== CorteStatus.RECEBIDO && c.dataPrevistaRecebimento && new Date(c.dataPrevistaRecebimento) < new Date();
                                             return (
-                                                <tr key={c.id} className="hover:bg-slate-800/30 transition-colors group border-l-2 border-transparent hover:border-nexus-cyan">
+                                                <tr key={c.id} className={`hover:bg-slate-800/30 transition-colors group border-l-2 ${isOverdue ? 'border-red-500 bg-red-500/5 shadow-[inset_0_0_20px_rgba(239,68,68,0.05)]' : 'border-transparent hover:border-nexus-cyan'}`}>
                                                     <td className="px-6 py-4 font-bold text-white">{c.referencia}</td>
                                                     <td className="px-6 py-4 text-slate-300">{faccoes.find(f => f.id === c.faccaoId)?.name}</td>
                                                     <td className="px-6 py-4">{new Date(c.dataEnvio).toLocaleDateString()}</td>

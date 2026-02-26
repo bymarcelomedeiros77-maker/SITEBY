@@ -3,7 +3,7 @@ import { debounce } from '../utils/performance';
 import {
   User, Faccao, Corte, DefectType, Meta, UserRole, CorteStatus, FaccaoStatus, LogEntry,
   Cliente, Produto, Cor, Tamanho, Sku, Pedido, MovimentacaoEstoque, OrdemProducao, StatusProducao, Devolucao,
-  FichaTecnica, FichaTipo, RegraConsumo
+  FichaTecnica, FichaTipo, RegraConsumo, Colecao, CompraCampanha, FinancialEntry, Supplier
 } from '../types';
 import { Toast, ToastType } from '../components/ToastNotification';
 import { supabase } from '../services/supabase';
@@ -41,6 +41,13 @@ interface AppContextType {
   // Fichas & Regras
   fichas: FichaTecnica[];
   regrasConsumo: RegraConsumo[];
+
+  // Melhorias Webpic
+  isStockLoading: boolean;
+  colecoes: Colecao[];
+  comprasCampanha: CompraCampanha[];
+  financialEntries: FinancialEntry[];
+  suppliers: Supplier[];
 
   // Cliente Actions
   addCliente: (cliente: Omit<Cliente, 'id'>) => Promise<any>;
@@ -107,6 +114,13 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const [regrasConsumo, setRegrasConsumo] = useState<RegraConsumo[]>([]);
 
   const [fichas, setFichas] = useState<FichaTecnica[]>([]);
+
+  // Melhorias Webpic State
+  const [isStockLoading, setIsStockLoading] = useState(false);
+  const [colecoes, setColecoes] = useState<Colecao[]>([]);
+  const [comprasCampanha, setComprasCampanha] = useState<CompraCampanha[]>([]);
+  const [financialEntries, setFinancialEntries] = useState<FinancialEntry[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   // Toast System
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -218,7 +232,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       }
     };
 
-    const intervalId = setInterval(checkUserStatus, 4000); // Check every 4 seconds
+    const intervalId = setInterval(checkUserStatus, 60000); // Check every 60 seconds
 
     // Initial check
     checkUserStatus();
@@ -256,7 +270,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     ]);
 
     if (faccoesData) setFaccoes(mapSupabaseResponse<Faccao[]>(faccoesData));
-    if (cortesData) setCortes(mapSupabaseResponse<Corte[]>(cortesData));
+    if (cortesData) {
+      const cortesComItens = cortesData.map((c: any) => ({ ...c, itens: c.itens || [] }));
+      setCortes(mapSupabaseResponse<Corte[]>(cortesComItens));
+    }
     if (defectsData) setDefectTypes(defectsData as DefectType[]);
     if (metasData) setMetas(mapSupabaseResponse<Meta[]>(metasData));
     if (logsData) setLogs(mapSupabaseResponse<LogEntry[]>(logsData));
@@ -269,6 +286,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   // Fetch Stock Data (Optimized)
   const fetchStockData = async () => {
     console.time('fetchStockData');
+    setIsStockLoading(true);
     try {
       // Parallelize all data fetches
       // Parallelize all data fetches with allSettled to prevent total failure
@@ -286,7 +304,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         supabase.from('pedido_itens').select('*'),
         supabase.from('ordens_producao').select('*').order('data_criacao', { ascending: false }).limit(200),
         supabase.from('devolucoes').select('*').order('data_devolucao', { ascending: false }).limit(100),
-        supabase.from('devolucao_itens').select('*')
+        supabase.from('devolucao_itens').select('*'),
+        // Novas Tabelas Webpic
+        supabase.from('colecoes').select('*').order('nome'),
+        supabase.from('compras_campanha').select('*'),
+        supabase.from('financial_entries').select('*').order('data', { ascending: false }),
+        supabase.from('suppliers').select('*').order('nome')
       ]);
 
       const getResult = (index: number) => {
@@ -433,10 +456,23 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       if (fichasData) setFichas(mapSupabaseResponse<FichaTecnica[]>(fichasData));
       if (movsData) setMovimentacoes(mapSupabaseResponse<MovimentacaoEstoque[]>(movsData));
 
+      // Set Webpic Data
+      const colecoesData = getResult(13);
+      const comprasCampanhaData = getResult(14);
+      const financialData = getResult(15);
+      const suppliersData = getResult(16);
+
+      if (colecoesData) setColecoes(colecoesData as Colecao[]);
+      if (comprasCampanhaData) setComprasCampanha(comprasCampanhaData as CompraCampanha[]);
+      if (financialData) setFinancialEntries(financialData as FinancialEntry[]);
+      if (suppliersData) setSuppliers(suppliersData as Supplier[]);
+
       cacheRef.current.stockTimestamp = Date.now();
       console.timeEnd('fetchStockData');
     } catch (error) {
       console.error('Error fetching stock data:', error);
+    } finally {
+      setIsStockLoading(false);
     }
   };
 
@@ -580,7 +616,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       qtd_total_recebida: 0,
       qtd_total_defeitos: 0,
       itens: corte.itens, // JSONB
-      defeitos_por_tipo: {}
+      defeitos_por_tipo: {},
+      valor_por_peca: corte.valor_por_peca || 0
     });
     createLog(corte.referencia, 'CORTE', 'CRIACAO', `Corte ${corte.referencia} enviado.`);
     setTimeout(fetchData, 200);
@@ -597,7 +634,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         qtd_total_defeitos: corte.qtdTotalDefeitos,
         observacoes_recebimento: corte.observacoesRecebimento,
         defeitos_por_tipo: corte.defeitosPorTipo,
-        itens: corte.itens
+        itens: corte.itens,
+        valor_por_peca: corte.valor_por_peca
       }).eq('id', corte.id);
 
       if (error) throw error;
@@ -715,7 +753,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       estado: cliente.estado,
       tags: cliente.tags || [],
       observacoes: cliente.observacoes,
-      notas_internas: cliente.notas_internas
+      notas_internas: cliente.notas_internas,
+      lat: cliente.lat,
+      lng: cliente.lng
     }).select();
 
     if (error) {
@@ -746,7 +786,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       estado: cliente.estado,
       observacoes: cliente.observacoes,
       notas_internas: cliente.notas_internas,
-      tags: cliente.tags || []
+      tags: cliente.tags || [],
+      lat: cliente.lat,
+      lng: cliente.lng
     }).eq('id', cliente.id);
 
     if (error) {
@@ -1245,6 +1287,192 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     }
   };
 
+  const saveUser = async (userData: Partial<User>) => {
+    try {
+      if (userData.id) {
+        const { error } = await supabase.from('users').update(userData).eq('id', userData.id);
+        if (error) throw error;
+        createLog(userData.id, 'FACCAO' as any, 'EDICAO', `Usuário ${userData.name} atualizado.`);
+      } else {
+        const { error } = await supabase.from('users').insert({
+          ...userData,
+          active: true // Default active for new users
+        });
+        if (error) throw error;
+        createLog('new_user', 'FACCAO' as any, 'CRIACAO', `Usuário ${userData.name} criado.`);
+      }
+      await fetchUsers();
+      fetchDataAll();
+
+      // Update current user state if editing self
+      if (user && userData.id === user.id) {
+        const updatedUser = { ...user, ...userData };
+        setUser(updatedUser as User);
+        localStorage.setItem('by_marcelo_user', JSON.stringify(updatedUser));
+      }
+    } catch (err: any) {
+      console.error("Erro ao salvar usuário:", err);
+      if (err.message && err.message.includes('users_email_key')) {
+        addToast('error', 'Este email já está em uso por outro usuário.');
+      } else {
+        addToast('error', `Erro ao salvar usuário: ${err.message || "Verifique o console."}`);
+      }
+    }
+  };
+
+  const deleteUser = async (id: string) => {
+    const { error } = await supabase.from('users').delete().eq('id', id);
+    if (error) {
+      console.error("Erro ao excluir usuário:", error);
+      addToast('error', "Erro ao excluir usuário.");
+      return false;
+    }
+    createLog(id, 'FACCAO' as any, 'STATUS', `Usuário excluído.`);
+    fetchDataAll();
+    addToast('success', "Usuário excluído com sucesso.");
+    return true;
+  };
+
+  const syncCorteToStock = async (corteId: string) => {
+    const corte = cortes.find(c => c.id === corteId);
+    if (!corte) return { success: false, message: 'Corte não encontrado.' };
+    if (corte.status !== 'RECEBIDO') return { success: false, message: 'Corte não está com status RECEBIDO.' };
+    return await stockService.syncCorteToStock(
+      corte,
+      produtos,
+      cores,
+      tamanhos,
+      skus,
+      adjustStock,
+      fetchDataAll
+    );
+  };
+
+  const addRegraConsumo = async (regra: Omit<RegraConsumo, 'id' | 'createdAt'>) => {
+    try {
+      const { error } = await supabase.from('regras_consumo').insert({
+        referencia: regra.referencia,
+        tamanho_id: regra.tamanhoId || null,
+        consumo_unitario: regra.consumoUnitario,
+        tecido_nome: regra.tecidoNome,
+        tecido_composicao: regra.tecidoComposicao,
+        tecido_largura: regra.tecidoLargura,
+        tecido_fornecedor: regra.tecidoFornecedor,
+        tecido_custo: regra.tecidoCusto,
+        acessorios: regra.acessorios,
+        usuario_id: user?.id || null
+      });
+      if (error) {
+        console.error("Error adding regra:", error);
+        addToast('error', `Erro ao adicionar regra: ${error.message}`);
+        return false;
+      }
+      await fetchStockData();
+      addToast('success', 'Regra de consumo adicionada com sucesso!');
+      return true;
+    } catch (err: any) {
+      console.error("Unexpected error adding regra:", err);
+      addToast('error', `Erro inesperado: ${err.message}`);
+      return false;
+    }
+  };
+
+  const updateRegraConsumo = async (regra: RegraConsumo) => {
+    try {
+      const { error } = await supabase.from('regras_consumo').update({
+        referencia: regra.referencia,
+        tamanho_id: regra.tamanhoId || null,
+        consumo_unitario: regra.consumoUnitario,
+        tecido_nome: regra.tecidoNome,
+        tecido_composicao: regra.tecidoComposicao,
+        tecido_largura: regra.tecidoLargura,
+        tecido_fornecedor: regra.tecidoFornecedor,
+        tecido_custo: regra.tecidoCusto,
+        acessorios: regra.acessorios
+      }).eq('id', regra.id);
+      if (error) {
+        console.error("Error updating regra:", error);
+        addToast('error', `Erro ao atualizar regra: ${error.message}`);
+        return false;
+      }
+      await fetchStockData();
+      addToast('success', 'Regra atualizada com sucesso!');
+      return true;
+    } catch (err: any) {
+      console.error("Unexpected error updating regra:", err);
+      addToast('error', `Erro inesperado: ${err.message}`);
+      return false;
+    }
+  };
+
+  const deleteRegraConsumo = async (id: string) => {
+    try {
+      const { error } = await supabase.from('regras_consumo').delete().eq('id', id);
+      if (error) {
+        console.error("Error deleting regra:", error);
+        addToast('error', `Erro ao excluir regra: ${error.message}`);
+        return false;
+      }
+      await fetchStockData();
+      addToast('success', 'Regra excluída com sucesso!');
+      return true;
+    } catch (err: any) {
+      console.error("Unexpected error deleting regra:", err);
+      addToast('error', `Erro inesperado: ${err.message}`);
+      return false;
+    }
+  };
+
+  const addColecao = async (colecao: Omit<Colecao, 'id'>) => {
+    const { error } = await supabase.from('colecoes').insert({
+      nome: colecao.nome,
+      data_inicio: colecao.dataInicio,
+      data_termino: colecao.dataTermino,
+      meta_vendas: colecao.meta_vendas
+    });
+    if (!error) fetchStockData();
+  };
+
+  const updateColecao = async (colecao: Colecao) => {
+    const { error } = await supabase.from('colecoes').update({
+      nome: colecao.nome,
+      data_inicio: colecao.dataInicio,
+      data_termino: colecao.dataTermino,
+      meta_vendas: colecao.meta_vendas
+    }).eq('id', colecao.id);
+    if (!error) fetchStockData();
+  };
+
+  const deleteColecao = async (id: string) => {
+    const { error } = await supabase.from('colecoes').delete().eq('id', id);
+    if (!error) fetchStockData();
+  };
+
+  const backupSystem = async () => {
+    try {
+      const data = await backupService.createBackup();
+      addToast('success', 'Backup gerado com sucesso!');
+      return data;
+    } catch (e) {
+      console.error(e);
+      addToast('error', 'Falha ao criar backup.');
+      return null;
+    }
+  };
+
+  const restoreSystem = async (backup: SystemBackup) => {
+    try {
+      await backupService.restoreBackup(backup);
+      await fetchDataAll();
+      addToast('success', 'Sistema restaurado com sucesso!');
+      return true;
+    } catch (e: any) {
+      console.error(e);
+      addToast('error', `Falha na restauração: ${e.message}`);
+      return false;
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       user,
@@ -1257,8 +1485,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       metas,
       logs,
       allUsers,
-
-      // Stock
       clientes,
       produtos,
       cores,
@@ -1270,216 +1496,40 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       movimentacoes,
       fichas,
       regrasConsumo,
-
-      // Actions
-
-      // ... (other actions implicitly passed if strict mode off, but explicit better)
-
-      // We need to pass all methods that are part of the interface
-      // Since we are returning a value object, we must ensure all properties of AppContextType are present.
-      // Based on the file content, the value object seems to include many individual properties.
-      // Let's check the value prop at the bottom of the file in the next step or assume standard spread if used.
-      // Actually, looking at lines 1080+, it explicitly lists properties. I need to add confirm there.
-
-      confirm, // Add confirm here
-
-      resetStock,
-      deleteProduto,
-
-
-
-      syncCorteToStock: async (corteId: string) => {
-        const corte = cortes.find(c => c.id === corteId);
-        if (!corte) return { success: false, message: 'Corte não encontrado.' };
-        if (corte.status !== 'RECEBIDO') return { success: false, message: 'Corte não está com status RECEBIDO.' };
-        return await stockService.syncCorteToStock(
-          corte,
-          produtos,
-          cores,
-          tamanhos,
-          skus,
-          adjustStock,
-          fetchDataAll
-        );
-      },
-      saveUser: async (userData: Partial<User>) => {
-        try {
-          if (userData.id) {
-            const { error } = await supabase.from('users').update(userData).eq('id', userData.id);
-            if (error) throw error;
-            createLog(userData.id, 'FACCAO' as any, 'EDICAO', `Usuário ${userData.name} atualizado.`);
-          } else {
-            const { error } = await supabase.from('users').insert({
-              ...userData,
-              active: true // Default active for new users
-            });
-            if (error) throw error;
-            createLog('new_user', 'FACCAO' as any, 'CRIACAO', `Usuário ${userData.name} criado.`);
-          }
-          await fetchUsers();
-          fetchDataAll();
-
-          // Update current user state if editing self
-          if (user && userData.id === user.id) {
-            const updatedUser = { ...user, ...userData };
-            setUser(updatedUser as User);
-            localStorage.setItem('by_marcelo_user', JSON.stringify(updatedUser));
-          }
-        } catch (err: any) {
-          console.error("Erro ao salvar usuário:", err);
-          if (err.message && err.message.includes('users_email_key')) {
-            addToast('error', 'Este email já está em uso por outro usuário.');
-          } else {
-            addToast('error', `Erro ao salvar usuário: ${err.message || "Verifique o console."}`);
-          }
-        }
-      },
-      deleteUser: async (id: string) => {
-        const { error } = await supabase.from('users').delete().eq('id', id);
-        if (error) {
-          console.error("Erro ao excluir usuário:", error);
-          addToast('error', "Erro ao excluir usuário.");
-          return false;
-        }
-        createLog(id, 'FACCAO' as any, 'STATUS', `Usuário excluído.`);
-        fetchDataAll();
-        addToast('success', "Usuário excluído com sucesso.");
-        return true;
-      },
-
-
-
-      addFaccao,
-      updateFaccao,
-      deleteFaccao,
-      addCorte,
-      updateCorte,
-      deleteCorte,
-      addDefectType,
-      updateMeta,
-
+      isStockLoading,
+      colecoes,
+      comprasCampanha,
+      financialEntries,
+      suppliers,
+      addCliente,
+      updateCliente,
+      fetchUsers,
       addPedido,
       updatePedidoStatus,
       addOrdemProducao,
       updateStatusProducao,
-      addDevolucao,
-
       adjustStock,
+      addDevolucao,
       addFicha,
       deleteFicha,
-
-
-      addRegraConsumo: async (regra: Omit<RegraConsumo, 'id' | 'createdAt'>) => {
-        try {
-          const { error } = await supabase.from('regras_consumo').insert({
-            referencia: regra.referencia,
-            tamanho_id: regra.tamanhoId || null,
-            consumo_unitario: regra.consumoUnitario,
-            tecido_nome: regra.tecidoNome,
-            tecido_composicao: regra.tecidoComposicao,
-            tecido_largura: regra.tecidoLargura,
-            tecido_fornecedor: regra.tecidoFornecedor,
-            tecido_custo: regra.tecidoCusto,
-            acessorios: regra.acessorios,
-            usuario_id: user?.id || null
-          });
-          if (error) {
-            console.error("Error adding regra:", error);
-            addToast('error', `Erro ao adicionar regra: ${error.message}`);
-            return false;
-          }
-          await fetchStockData();
-          addToast('success', 'Regra de consumo adicionada com sucesso!');
-          return true;
-        } catch (err: any) {
-          console.error("Unexpected error adding regra:", err);
-          addToast('error', `Erro inesperado: ${err.message}`);
-          return false;
-        }
-      },
-      updateRegraConsumo: async (regra: RegraConsumo) => {
-        try {
-          const { error } = await supabase.from('regras_consumo').update({
-            referencia: regra.referencia,
-            tamanho_id: regra.tamanhoId || null,
-            consumo_unitario: regra.consumoUnitario,
-            tecido_nome: regra.tecidoNome,
-            tecido_composicao: regra.tecidoComposicao,
-            tecido_largura: regra.tecidoLargura,
-            tecido_fornecedor: regra.tecidoFornecedor,
-            tecido_custo: regra.tecidoCusto,
-            acessorios: regra.acessorios
-          }).eq('id', regra.id);
-          if (error) {
-            console.error("Error updating regra:", error);
-            addToast('error', `Erro ao atualizar regra: ${error.message}`);
-            return false;
-          }
-          await fetchStockData();
-          addToast('success', 'Regra atualizada com sucesso!');
-          return true;
-        } catch (err: any) {
-          console.error("Unexpected error updating regra:", err);
-          addToast('error', `Erro inesperado: ${err.message}`);
-          return false;
-        }
-      },
-      deleteRegraConsumo: async (id: string) => {
-        try {
-          const { error } = await supabase.from('regras_consumo').delete().eq('id', id);
-          if (error) {
-            console.error("Error deleting regra:", error);
-            addToast('error', `Erro ao excluir regra: ${error.message}`);
-            return false;
-          }
-          await fetchStockData();
-          addToast('success', 'Regra excluída com sucesso!');
-          return true;
-        } catch (err: any) {
-          console.error("Unexpected error deleting regra:", err);
-          addToast('error', `Erro inesperado: ${err.message}`);
-          return false;
-        }
-      },
-
-
-
-      backupSystem: async () => {
-        try {
-          const data = await backupService.createBackup();
-          addToast('success', 'Backup gerado com sucesso!');
-          return data;
-        } catch (e) {
-          console.error(e);
-          addToast('error', 'Falha ao criar backup.');
-          return null;
-        }
-      },
-
-      restoreSystem: async (backup: SystemBackup) => {
-        try {
-          await backupService.restoreBackup(backup);
-          await fetchDataAll();
-          addToast('success', 'Sistema restaurado com sucesso!');
-          return true;
-        } catch (e: any) {
-          console.error(e);
-          addToast('error', `Falha na restauração: ${e.message}`);
-          return false;
-        }
-      },
-
+      addRegraConsumo,
+      updateRegraConsumo,
+      deleteRegraConsumo,
+      addColecao,
+      updateColecao,
+      deleteColecao,
+      resetStock,
+      deleteProduto,
+      syncCorteToStock,
+      backupSystem,
+      restoreSystem,
       toasts,
       addToast,
       removeToast,
-
-      // Actions
-      fetchUsers,
-      addCliente,
-      updateCliente,
+      confirm
     }}>
       {children}
-      < ConfirmDialog
+      <ConfirmDialog
         isOpen={confirmState.isOpen}
         onClose={closeDialog}
         onConfirm={confirmState.onConfirm}
@@ -1489,7 +1539,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         cancelText={confirmState.cancelText}
         type={confirmState.type}
       />
-    </AppContext.Provider >
+    </AppContext.Provider>
   );
 };
 

@@ -193,17 +193,15 @@ export class StockSyncService {
             if (produto) {
                 for (const item of corte.itens) {
                     const cor = cores.find(c => c.nome.trim().toLowerCase() === item.cor.trim().toLowerCase());
-                    if (cor && item.gradeRecebida) {
-                        for (const g of item.gradeRecebida) {
+                    // Fallback: usa gradeRecebida se disponível, senão usa grade original
+                    const gradeParaEstorno = item.gradeRecebida || item.grade || [];
+                    if (cor && gradeParaEstorno.length > 0) {
+                        for (const g of gradeParaEstorno) {
                             if (g.quantidade > 0) {
                                 const tamanho = tamanhos.find(t => t.nome.trim().toUpperCase() === g.tamanho.trim().toUpperCase());
                                 if (tamanho) {
-                                    // Precisamos encontrar o SKU. Como estamos num serviço, usamos a lista passada ou buscamos.
-                                    // A lista 'skus' passada deve estar atualizada.
                                     const sku = skus.find(s => s.produtoId === produto!.id && s.corId === cor!.id && s.tamanhoId === tamanho!.id);
-
                                     if (sku) {
-                                        // Remove o que foi adicionado
                                         await adjustStockFn(sku.id, g.quantidade, 'AJUSTE_NEGATIVO', `Estorno Recebimento Corte ${corte.referencia}`, true);
                                     } else {
                                         console.warn(`[StockSync] SKU não encontrado para estorno: ${produto.referencia} ${cor.nome} ${tamanho.nome}`);

@@ -17,6 +17,8 @@ import { Clients } from './pages/Clients';
 import { StockControl } from './pages/StockControl';
 
 import { CuttingOrders } from './pages/CuttingOrders';
+import { Financeiro } from './pages/Financeiro';
+import { Fornecedores } from './pages/Fornecedores';
 
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { user, isLoading } = useApp();
@@ -134,6 +136,26 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <Layout>
               <CuttingOrders />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/financeiro"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Financeiro />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/fornecedores"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Fornecedores />
             </Layout>
           </ProtectedRoute>
         }
